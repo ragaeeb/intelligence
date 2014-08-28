@@ -9,7 +9,7 @@ import java.util.regex.Pattern;
 
 import com.canadainc.intelligence.model.Report;
 
-public class QuranConsumer implements Consumer
+public class SalatConsumer implements Consumer
 {
 	private final Pattern surahRegex = Pattern.compile("surah_id\", QVariant\\(int,\\s+\\d{1,3}", Pattern.CASE_INSENSITIVE);
 	private final Pattern verseRegex = Pattern.compile("verse_id\"\\s+,\\s+QVariant\\(int,\\s+\\d{1,3}", Pattern.CASE_INSENSITIVE);
@@ -19,7 +19,7 @@ public class QuranConsumer implements Consumer
 		return m_bookmarks;
 	}
 
-	public QuranConsumer()
+	public SalatConsumer()
 	{
 	}
 

@@ -1,10 +1,25 @@
-package com.canadainc.intelligence.model;
+package com.canadainc.intelligence.controller;
 
-import java.text.*;
-import java.util.*;
-import java.util.regex.*;
+import java.text.DateFormat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import com.canadainc.intelligence.client.Consumer;
+import com.canadainc.intelligence.model.AppWorldInfo;
+import com.canadainc.intelligence.model.DatabaseStat;
+import com.canadainc.intelligence.model.DeviceAppInfo;
+import com.canadainc.intelligence.model.FormattedReport;
+import com.canadainc.intelligence.model.Location;
+import com.canadainc.intelligence.model.Report;
 
 public class ReportAnalyzer
 {
@@ -12,8 +27,10 @@ public class ReportAnalyzer
 	private FormattedReport m_result;
 	private static final Map<String, Pattern> PATTERNS = new HashMap<String, Pattern>();
 	private static final DateFormat OS_CREATION_FORMAT = new SimpleDateFormat("yyyy/MM/dd-HH:mm:ssz"); // OS Creation: 2014/02/09-15:22:47EST
+	private static final DateFormat BOOT_TIME_FORMAT = new SimpleDateFormat("MMM dd HH:mm:ss z yyyy"); // Aug 21 16:18:37 EDT 2014
 	private static final Pattern VALID_EMAIL_ADDRESS_REGEX = Pattern.compile("^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,6}$", Pattern.CASE_INSENSITIVE);
 	private static Collection<String> EXCLUDED_SETTINGS = new HashSet<String>();
+	private static final String INSTALL_DATA = "dat::";
 	private Map<String,Consumer> m_consumers = new HashMap<String,Consumer>();
 	private Consumer m_consumer;
 	
@@ -25,6 +42,7 @@ public class ReportAnalyzer
 		EXCLUDED_SETTINGS.add("accountId");
 		EXCLUDED_SETTINGS.add("promoted");
 		EXCLUDED_SETTINGS.add("init");
+		EXCLUDED_SETTINGS.add("analytics_collected");
 	}
 
 	public void setConsumers(Map<String,Consumer> consumers) {
@@ -44,7 +62,7 @@ public class ReportAnalyzer
 	}
 
 
-	private static List<String> getValues(String key, String text, boolean sanitize)
+	public static List<String> getValues(String key, String text, boolean sanitize)
 	{
 		if ( !PATTERNS.containsKey(key) )
 		{
@@ -63,7 +81,28 @@ public class ReportAnalyzer
 	}
 	
 	
-	private static List<String> getValues(String key, String text) {
+	public static List<String> getEqualValue(String key, String text)
+	{
+		if ( !PATTERNS.containsKey(key) ) {
+			PATTERNS.put( key, Pattern.compile( key+"=[^\n]+", Pattern.CASE_INSENSITIVE) );
+		}
+		
+		Matcher matcher = PATTERNS.get(key).matcher(text);
+		List<String> results = new ArrayList<String>();
+
+		while ( matcher.find() )
+		{
+			String match = text.substring( matcher.start()+key.length(), matcher.end() ).trim();
+			String[] tokens = match.split("=");
+			
+			results.add( tokens[1] );
+		}
+
+		return results;
+	}
+	
+	
+	public static List<String> getValues(String key, String text) {
 		return getValues(key, text, true);
 	}
 
@@ -101,10 +140,58 @@ public class ReportAnalyzer
 		
 		result = getValues("memoryUsedByCurrentProcess:", deviceInfo);
 		if ( !result.isEmpty() ) {
-			m_result.appInfo.memoryUsage = Long.parseLong( result.get(0) );
+			m_result.memoryUsage = Long.parseLong( result.get(0) );
+		}
+		
+		result = getValues("availableDeviceMemory:", deviceInfo);
+		if ( !result.isEmpty() ) {
+			m_result.availableMemory = Long.parseLong( result.get(0) );
+		}
+		
+		result = getValues("BatteryChargingState:", deviceInfo);
+		if ( !result.isEmpty() ) {
+			m_result.batteryInfo.chargingState = Integer.parseInt( result.get(0) );
+		}
+		
+		result = getValues("BatteryCycleCount:", deviceInfo);
+		if ( !result.isEmpty() ) {
+			m_result.batteryInfo.cycleCount = Integer.parseInt( result.get(0) );
+		}
+		
+		result = getValues("BatteryLevel:", deviceInfo);
+		if ( !result.isEmpty() ) {
+			m_result.batteryInfo.level = Integer.parseInt( result.get(0) );
+		}
+		
+		result = getValues("BatteryTemperature:", deviceInfo);
+		if ( !result.isEmpty() ) {
+			m_result.batteryInfo.temperature = Integer.parseInt( result.get(0) );
+		}
+		
+		result = getValues("InternalDevice:", deviceInfo);
+		if ( !result.isEmpty() ) {
+			m_result.userInfo.internal = result.get(0).equals("1");
+		}
+		
+		result = getEqualValue("bcm0", deviceInfo);
+		if ( !result.isEmpty() ) {
+			m_result.userInfo.network.bcm0 = result.get(0);
+		}
+		
+		result = getEqualValue("bptp0", deviceInfo);
+		if ( !result.isEmpty() ) {
+			m_result.userInfo.network.bptp0 = result.get(0);
+		}
+		
+		result = getEqualValue("msm0", deviceInfo);
+		if ( !result.isEmpty() ) {
+			m_result.userInfo.network.msm0 = result.get(0);
 		}
 
-		m_result.userInfo.machine = getValues("Machine:", deviceInfo).get(0);
+		m_result.hardwareInfo.machine = getValues("Machine:", deviceInfo).get(0);
+		m_result.hardwareInfo.modelName = getValues("ModelName:", deviceInfo).get(0);
+		m_result.hardwareInfo.modelNumber = getValues("ModelNumber:", deviceInfo).get(0);
+		m_result.hardwareInfo.physicalKeyboard = getValues("PhysicalKeyboard:", deviceInfo).get(0).equals("1");
 		m_result.userInfo.nodeName = getValues("NodeName:", deviceInfo).get(0);
 	}
 
@@ -189,6 +276,25 @@ public class ReportAnalyzer
 				}
 			}
 			
+			result = getValues("run AccountImporter::run()", log);
+			for (String total: result) {
+				m_result.totalAccounts += Integer.parseInt(total);
+			}
+			
+			result = getValues("processAllConversations ==== TOTAL", log);
+			for (String total: result)
+			{
+				int n = Integer.parseInt(total);
+				m_result.conversationsFetched.add(n);
+			}
+			
+			result = getValues("getResult Elements generated:", log);
+			for (String total: result)
+			{
+				int n = Integer.parseInt(total);
+				m_result.elementsFetched.add(n);
+			}
+			
 			List<String> settings = getValues("getValueFor:", log);
 			for (String setting: settings)
 			{
@@ -218,7 +324,7 @@ public class ReportAnalyzer
 				{
 					lookupSetting(key, value);
 				} else if ( value.equals("init") ) {
-					m_result.appInfo.installTimestamp = Long.parseLong(value);
+					m_result.installTimestamp = Long.parseLong(value);
 				}
 			}
 		}
@@ -238,7 +344,86 @@ public class ReportAnalyzer
 			m_result.appSettings.put(key, value);
 		}
 	}
+	
+	
+	private void analyzeBootTime()
+	{
+		try {
+			m_result.bootTime = BOOT_TIME_FORMAT.parse( m_report.bootTime ).getTime();
+		} catch (ParseException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	
+	private void analyzeIpData()
+	{
+		String[] data = m_report.ipData.split("\n");
+		m_result.userInfo.network.ip = data[0].split("=")[1].trim();
+		m_result.userInfo.network.host = data[1].split("=")[1].trim();
+	}
 
+	
+	private void analyzeRemovedApps()
+	{
+		String[] data = m_report.removedApps.split("\n");
+		data = Arrays.copyOfRange(data, 1, data.length);
+		
+		for (String app: data)
+		{
+			DeviceAppInfo dai = new DeviceAppInfo();
+			int bbWorldStart = app.indexOf(INSTALL_DATA);
+			
+			if (bbWorldStart >= 0)
+			{
+				String appWorldData = app.substring(bbWorldStart);
+				app = app.substring(0, bbWorldStart-1);
+				int start = appWorldData.indexOf("{");
+				int end = appWorldData.lastIndexOf("}");
+				String awData = appWorldData.substring(start+1, end).trim();
+				String regex = "\\s+(?=((\\\\[\\\\\"]|[^\\\\\"])*\"(\\\\[\\\\\"]|[^\\\\\"])*\")*(\\\\[\\\\\"]|[^\\\\\"])*$)";
+				awData = awData.replaceAll(regex, "");
+				String[] awMetaData = awData.split(",");
+				
+				AppWorldInfo awi = new AppWorldInfo();
+				
+				for (String attribute: awMetaData)
+				{
+					String[] attributes = attribute.split(":(?=([^\"]*\"[^\"]*\")*[^\"]*$)");
+					String key = removeQuotes(attributes[0]);
+					String value = removeQuotes(attributes[1]);
+					
+					if ( key.equals("contentID") ) {
+						awi.contentId = Integer.parseInt(value);
+					} else if ( key.equals("iconID") ) {
+						awi.iconUri = value;
+					} else if ( key.equals("id") ) {
+						awi.id = Integer.parseInt(value);
+					} else if ( key.equals("sku") ) {
+						awi.sku = value;
+					} else if ( key.equals("vendor") ) {
+						awi.vendor = value;
+					} else if ( key.equals("name") ) {
+						awi.name = value;
+					}
+				}
+				
+				dai.appWorldInfo = awi;
+			}
+
+			String[] tokens = app.split(",");
+
+			dai.packageName = tokens[0].split("::")[0];
+			dai.packageVersion = tokens[1];
+			m_result.removedApps.add(dai);
+		}
+	}
+	
+	
+	private static String removeQuotes(String input) {
+		return input.substring(1, input.length()-1);
+	}
+	
 
 	public FormattedReport analyze()
 	{
@@ -254,6 +439,22 @@ public class ReportAnalyzer
 		
 		if ( !m_report.settings.isEmpty() ) {
 			analyzeSettings();
+		}
+		
+		if ( !m_report.bootTime.isEmpty() ) {
+			analyzeBootTime();
+		}
+		
+		if ( !m_report.ipData.isEmpty() ) {
+			analyzeIpData();
+		}
+		
+		if ( !m_report.removedApps.isEmpty() ) {
+			analyzeRemovedApps();
+		}
+		
+		if (m_consumer != null) {
+			m_consumer.consume(m_report);
 		}
 
 		return m_result;

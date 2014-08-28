@@ -11,4 +11,7 @@ public class Report
 	public String settings = new String();
 	public long timestamp;
 	public List<String> assets = new ArrayList<String>();
+	public String ipData = new String();
+	public String bootTime = new String();
+	public String removedApps = new String();
 }

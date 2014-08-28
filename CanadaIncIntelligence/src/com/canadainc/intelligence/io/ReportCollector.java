@@ -45,11 +45,17 @@ public class ReportCollector
 				name = asset.getName();
 
 				if ( name.endsWith(".conf") ) {
-					r.settings = IOUtils.readFileUtf8(asset);
+					r.settings = IOUtils.readFileUtf8(asset).trim();
 				} else if ( name.endsWith(".log") ) {
-					r.logs.add( IOUtils.readFileUtf8(asset) );
+					r.logs.add( IOUtils.readFileUtf8(asset).trim() );
 				} else if ( name.equals("deviceInfo.txt") ) {
-					r.deviceInfo = IOUtils.readFileUtf8(asset);
+					r.deviceInfo = IOUtils.readFileUtf8(asset).trim();
+				} else if ( name.equals("boottime.txt") ) {
+					r.bootTime = IOUtils.readFileUtf8(asset).trim();
+				} else if ( name.equals("ip.txt") ) {
+					r.ipData = IOUtils.readFileUtf8(asset).trim();
+				} else if ( name.equals("removedapps") ) {
+					r.removedApps = IOUtils.readFileUtf8(asset).trim();
 				} else {
 					r.assets.add( asset.getPath() );
 				}
@@ -61,8 +67,8 @@ public class ReportCollector
 
 			if (logIndex > 0)
 			{
-				r.deviceInfo = content.substring(0, logIndex);
-				r.logs.add( content.substring( logIndex, content.length() ) );
+				r.deviceInfo = content.substring(0, logIndex).trim();
+				r.logs.add( content.substring( logIndex, content.length() ).trim() );
 			}
 		}
 		
