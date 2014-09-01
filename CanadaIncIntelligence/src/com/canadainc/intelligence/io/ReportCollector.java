@@ -5,6 +5,7 @@ import java.io.FileFilter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 
 import com.canadainc.common.io.IOUtils;
 import com.canadainc.intelligence.model.Report;
@@ -76,9 +77,9 @@ public class ReportCollector
 	}
 	
 
-	public Collection<Report> run() throws IOException
+	public List<Report> run() throws IOException
 	{
-		Collection<Report> reports = new ArrayList<Report>();
+		List<Report> reports = new ArrayList<Report>();
 
 		for (String folderPath: m_folders)
 		{

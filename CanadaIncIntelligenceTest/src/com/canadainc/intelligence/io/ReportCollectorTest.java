@@ -5,6 +5,7 @@ import static org.junit.Assert.*;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -74,17 +75,25 @@ public class ReportCollectorTest
 		m_instance.setFolders(folders);
 		
 		try {
-			Collection<Report> reports = m_instance.run();
-			assertEquals( 1, reports.size() );
+			List<Report> reports = m_instance.run();
+			assertEquals( 2, reports.size() );
 			
-			for (Report r: reports) {
-				assertEquals( Long.parseLong("1403455028364"), r.timestamp );
-				assertTrue( !r.deviceInfo.isEmpty() );
-				assertEquals( 2, r.logs.size() );
-				assertTrue( !r.settings.isEmpty() );
-				assertEquals( 1, r.assets.size() );
-				assertEquals( "res/auto_block/1403455028364/database.db", r.assets.get(0) );
-			}
+			Report r = reports.get(0);
+			assertEquals( Long.parseLong("1403455028364"), r.timestamp );
+			assertTrue( !r.deviceInfo.isEmpty() );
+			assertEquals( 2, r.logs.size() );
+			assertTrue( !r.settings.isEmpty() );
+			assertEquals( 1, r.assets.size() );
+			assertEquals( "res/auto_block/1403455028364/database.db", r.assets.get(0) );
+			
+			r = reports.get(1);
+			assertEquals( Long.parseLong("1406619880273"), r.timestamp );
+			assertTrue( !r.deviceInfo.isEmpty() );
+			assertEquals( 1, r.logs.size() );
+			assertTrue( !r.settings.isEmpty() );
+			assertTrue( !r.ipData.isEmpty() );
+			assertEquals( 1, r.assets.size() );
+			assertEquals( "res/auto_block/1406619880273/database.db", r.assets.get(0) );
 		} catch (IOException e) {
 			e.printStackTrace();
 			fail("Failed!");
@@ -107,7 +116,7 @@ public class ReportCollectorTest
 			for (Report r: reports) {
 				assertEquals( Long.parseLong("1408723806275"), r.timestamp );
 				assertTrue( !r.deviceInfo.isEmpty() );
-				assertEquals( 1, r.logs.size() );
+				assertEquals( 2, r.logs.size() );
 				assertTrue( !r.settings.isEmpty() );
 				assertTrue( !r.bootTime.isEmpty() );
 				assertTrue( !r.ipData.isEmpty() );

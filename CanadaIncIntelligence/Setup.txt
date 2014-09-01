@@ -26,7 +26,7 @@ CREATE TABLE bulk_operations(report_id INTEGER REFERENCES reports(id), type TEXT
 CREATE TABLE conversations_fetched(report_id INTEGER REFERENCES reports(id), count INTEGER);
 CREATE TABLE elements_fetched(report_id INTEGER REFERENCES reports(id), count INTEGER);
 CREATE TABLE in_app_searches(report_id INTEGER REFERENCES reports(id), name TEXT, query_value TEXT);
-CREATE TABLE invoke_targets(report_id INTEGER REFERENCES reports(id), target_id TEXT, count INTEGER);
+CREATE TABLE invoke_targets(report_id INTEGER REFERENCES reports(id), target_id TEXT, uri TEXT, data TEXT);
 CREATE TABLE total_accounts(report_id INTEGER REFERENCES reports(id), total INTEGER);
 
 

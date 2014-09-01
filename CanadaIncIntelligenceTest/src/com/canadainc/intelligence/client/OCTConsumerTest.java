@@ -13,6 +13,7 @@ import org.junit.Test;
 
 import com.canadainc.intelligence.controller.ReportAnalyzer;
 import com.canadainc.intelligence.io.ReportCollector;
+import com.canadainc.intelligence.model.FormattedReport;
 import com.canadainc.intelligence.model.Report;
 
 public class OCTConsumerTest
@@ -35,14 +36,6 @@ public class OCTConsumerTest
 		ra.setReport(r);
 		ra.setConsumers(consumers);
 		ra.analyze();
-
-		Collection<String> stops = instance.getStops();
-		assertEquals( 5, stops.size() );
-		assertTrue( stops.contains("2372") );
-		assertTrue( stops.contains("2374") );
-		assertTrue( stops.contains("2414") );
-		assertTrue( stops.contains("7666") );
-		assertTrue( stops.contains("7668") );
 	}
 
 
@@ -57,10 +50,14 @@ public class OCTConsumerTest
 		ReportAnalyzer ra = new ReportAnalyzer();
 		ra.setReport(r);
 		ra.setConsumers(consumers);
-		ra.analyze();
-
-		Collection<String> stops = instance.getStops();
-		assertEquals( 1, stops.size() );
-		assertTrue( stops.contains("8798") );
+		FormattedReport result = ra.analyze();
+		assertEquals( 4, result.appSettings.size() );
+		assertEquals( 1, result.inAppSearches.size() );
+		assertEquals( "performStopsQuery", result.inAppSearches.get(0).name );
+		assertEquals( "WELLINGTON / O'CONNOR", result.inAppSearches.get(0).query );
+		
+		assertEquals( 1, instance.getHomescreens().size() );
+		assertEquals( 7196, instance.getHomescreens().get(0).stopCode );
+		assertEquals( "7196:WALKLEY / JASPER (8)", instance.getHomescreens().get(0).name );
 	}
 }

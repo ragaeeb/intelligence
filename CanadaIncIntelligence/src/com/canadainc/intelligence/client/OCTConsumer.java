@@ -1,82 +1,108 @@
 package com.canadainc.intelligence.client;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import com.canadainc.intelligence.controller.ReportAnalyzer;
+import com.canadainc.common.text.TextUtils;
+import com.canadainc.intelligence.client.SunnahConsumer.SunnahShortcut;
+import com.canadainc.intelligence.model.FormattedReport;
+import com.canadainc.intelligence.model.InAppSearch;
 import com.canadainc.intelligence.model.Report;
 
 public class OCTConsumer implements Consumer
 {
-	private final Pattern stopNumbers = Pattern.compile("\\d{4}:", Pattern.CASE_INSENSITIVE);
-	private Collection<String> m_stops = new HashSet<String>();
-	
-	public Collection<String> getStops() {
-		return m_stops;
+	private static final String STOP_CODE_PATTERN = "stop_code\", QVariant(int, ";
+	private static Collection<String> EXCLUDED_SETTINGS = new HashSet<String>();
+	private List<OCTShortcut> m_homescreens = new ArrayList<OCTShortcut>();
+	public List<OCTShortcut> getHomescreens() {
+		return m_homescreens;
 	}
 
+	static {
+		EXCLUDED_SETTINGS.add("dbVersion");
+		EXCLUDED_SETTINGS.add("expiryDate");
+		EXCLUDED_SETTINGS.add("hideAgreement");
+		EXCLUDED_SETTINGS.add("lastUpdate");
+	}
+	
 	public OCTConsumer()
 	{
 	}
 
 	@Override
-	public void consume(Report r)
+	public void consume(Report r, FormattedReport fr)
 	{
-		Collection<String> stopQueries = new HashSet<String>();
-		Collection<String> routeQueries = new HashSet<String>();
-		Collection<String> tripQueries = new HashSet<String>();
-		
 		for (String log: r.logs)
 		{
-			List<String> result = ReportAnalyzer.getValues("performStopsQuery", log);
+			List<String> result = TextUtils.getValues("performStopsQuery", log);
 			
 			for (String query: result)
 			{
 				query = query.substring( 1, query.length()-1 ); // without quotes
-				stopQueries.add(query);
+				
+				InAppSearch ias = new InAppSearch("performStopsQuery", query);
+				fr.inAppSearches.add(ias);
 			}
 			
-			result = ReportAnalyzer.getValues("performRoutesQuery", log);
+			result = TextUtils.getValues("performRoutesQuery", log);
 			
 			for (String query: result)
 			{
 				String[] tokens = query.split(" ");
 				query = tokens[0].substring( 1, tokens[0].length()-1 ); // without quotes
-				routeQueries.add(query);
+
+				InAppSearch ias = new InAppSearch("performRoutesQuery", query);
+				fr.inAppSearches.add(ias);
 			}
 			
-			result = ReportAnalyzer.getValues("performTripTimesQuery", log);
+			result = TextUtils.getValues("performTripTimesQuery", log);
 			
 			for (String query: result)
 			{
 				String[] tokens = query.split(" ");
 				query = tokens[0].substring( 1, tokens[0].length()-1 ); // without quotes
-				tripQueries.add(query);
+				
+				InAppSearch ias = new InAppSearch("performTripTimesQuery", query);
+				fr.inAppSearches.add(ias);
+			}
+			
+			result = TextUtils.getValues("addToHomeScreen Adding shortcut", log);
+			for (String query: result)
+			{
+				int start = query.indexOf(STOP_CODE_PATTERN);
+				int end = query.indexOf(")", start);
+				
+				String stopCode = query.substring( start+STOP_CODE_PATTERN.length(), end );
+				String[] tokens = query.split(" (?=(([^'\"]*['\"]){2})*[^'\"]*$)");
+				String name = TextUtils.removeQuotes( tokens[tokens.length-1] );
+				OCTShortcut s = new OCTShortcut( name, Integer.parseInt(stopCode) );
+				m_homescreens.add(s);
 			}
 		}
 	}
 
 	@Override
-	public String consumeSetting(String key, String value)
+	public String consumeSetting(String key, String value, FormattedReport fr)
 	{
-		if ( key.equals("bookmarks") )
-		{
-			Matcher m = stopNumbers.matcher(value);
-			
-			while ( m.find() ) {
-				m_stops.add( value.substring( m.start(), m.end()-1 ) );
-			}
-
+		if ( EXCLUDED_SETTINGS.contains(key) ) {
 			return null;
-		} else if ( key.equals("expiryDate") ) {
-			return null;
-		}
-		
-		else {
+		} else {
 			return value;
+		}
+	}
+	
+	public class OCTShortcut
+	{
+		public String name;
+		public int stopCode;
+		public OCTShortcut(String name, int stopCode) {
+			super();
+			this.name = name;
+			this.stopCode = stopCode;
 		}
 	}
 }

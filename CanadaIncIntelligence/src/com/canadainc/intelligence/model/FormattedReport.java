@@ -5,6 +5,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.canadainc.intelligence.client.InvokeTarget;
+
 public class FormattedReport
 {
 	/** The app this report is being generated for. */
@@ -35,7 +37,7 @@ public class FormattedReport
 	public List<Integer> conversationsFetched = new ArrayList<Integer>();
 	public List<Integer> elementsFetched = new ArrayList<Integer>();
 	public List<InAppSearch> inAppSearches = new ArrayList<InAppSearch>();
-	public List<String> invokeTargets = new ArrayList<String>();
+	public List<InvokeTarget> invokeTargets = new ArrayList<InvokeTarget>();
 	
 	
 	public class AppInfo
@@ -55,17 +57,6 @@ public class FormattedReport
 	}
 	
 	
-	/**
-	 * A bulk operation is an operation when the user does a bunch of elements in bulk. For example, in Auto Block, when the choose to
-	 * block a bunch of addresses at once. Or block a bunch of keywords at once.
-	 */
-	public class BulkOperation
-	{
-		public String type;
-		public int count;
-	}
-	
-	
 	public class HardwareInfo
 	{
 		public long deviceMemory;
@@ -74,16 +65,6 @@ public class FormattedReport
 		public String modelName = new String();
 		public boolean physicalKeyboard;
 		public String modelNumber = new String();
-	}
-	
-	
-	/**
-	 * Any type of search that is done in an app. For example, looking up a hadith text. Or looking up a stop number.
-	 */
-	public class InAppSearch
-	{
-		public String name;
-		public String query;
 	}
 	
 	

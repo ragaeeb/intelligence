@@ -42,7 +42,7 @@ public class ReportAnalyzerTest
 		assertEquals("en_US", fr.locale);
 		assertEquals( 151990272, fr.memoryUsage );
 		
-		assertEquals( 7, fr.appSettings.size() );
+		assertEquals( 6, fr.appSettings.size() );
 		assertEquals( "3", fr.appSettings.get("keywordThreshold") );
 		assertEquals( "1", fr.appSettings.get("whitelistContacts") );
 		
@@ -110,9 +110,9 @@ public class ReportAnalyzerTest
 		assertTrue( fr.locale.isEmpty() );
 		assertEquals( 212058112, fr.memoryUsage );
 		
-		assertEquals( 19, fr.appSettings.size() );
+		assertEquals( 17, fr.appSettings.size() );
 		assertEquals( "1", fr.appSettings.get("alFurqanAdvertised") );
-		assertEquals( "1", fr.appSettings.get("v3.5") );
+		assertNull( fr.appSettings.get("v3.5") );
 		
 		List<DatabaseStat> stats = fr.databaseStats;
 		assertEquals( 47, stats.size() );
@@ -154,7 +154,7 @@ public class ReportAnalyzerTest
 		assertEquals( 68, stats.get( stats.size()-1 ).duration );
 		assertEquals( 3, stats.get( stats.size()-1 ).elements );
 		
-		assertEquals( 6, fr.appSettings.size() );
+		assertEquals( 5, fr.appSettings.size() );
 		assertEquals( "201404061716", fr.appSettings.get("dbVersion") );
 		assertEquals( "0.004", fr.appSettings.get("radius") );
 		
@@ -170,10 +170,10 @@ public class ReportAnalyzerTest
 		Consumer c = new Consumer()
 		{
 			@Override
-			public void consume(Report r) {}
+			public void consume(Report r, FormattedReport result) {}
 
 			@Override
-			public String consumeSetting(String key, String value) {
+			public String consumeSetting(String key, String value, FormattedReport fr) {
 				return key.equals("bookmarks") ? value : null;
 			}
 		};
@@ -205,8 +205,6 @@ public class ReportAnalyzerTest
 		
 		assertEquals( 1, fr.appSettings.size() );
 		assertTrue( fr.appSettings.containsKey("bookmarks") );
-		String value = fr.appSettings.get("bookmarks");
-		assertTrue( value.startsWith("QVariant(QVariantList, (QVariant(QVariantMap, QMap((\"name\"") && value.endsWith("CATHERINE / O'CONNOR\") ) )  ) ) )  ) )  )") );
 	}
 	
 	

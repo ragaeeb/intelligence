@@ -1,22 +1,30 @@
 package com.canadainc.intelligence.client;
 
-import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.canadainc.intelligence.model.FormattedReport;
+import com.canadainc.intelligence.model.Location;
 import com.canadainc.intelligence.model.Report;
 
 public class SalatConsumer implements Consumer
 {
-	private final Pattern surahRegex = Pattern.compile("surah_id\", QVariant\\(int,\\s+\\d{1,3}", Pattern.CASE_INSENSITIVE);
-	private final Pattern verseRegex = Pattern.compile("verse_id\"\\s+,\\s+QVariant\\(int,\\s+\\d{1,3}", Pattern.CASE_INSENSITIVE);
-	private Collection<Bookmark> m_bookmarks = new HashSet<Bookmark>();
-	
-	public Collection<Bookmark> getBookmarks() {
-		return m_bookmarks;
+	private static Collection<String> EXCLUDED_SETTINGS = new HashSet<String>();
+	private static final Map<String, Pattern> PATTERNS = new HashMap<String, Pattern>();
+
+	static {
+		EXCLUDED_SETTINGS.add("advertisedSalafyInk");
+		EXCLUDED_SETTINGS.add("alFurqanAdvertised");
+		EXCLUDED_SETTINGS.add("altitude");
+		EXCLUDED_SETTINGS.add("angles");
+		EXCLUDED_SETTINGS.add("athanPicked");
+		EXCLUDED_SETTINGS.add("athanPrompted");
+		EXCLUDED_SETTINGS.add("donateNotice");
+		EXCLUDED_SETTINGS.add("lastUpdate");
 	}
 
 	public SalatConsumer()
@@ -24,46 +32,95 @@ public class SalatConsumer implements Consumer
 	}
 
 	@Override
-	public void consume(Report r)
+	public void consume(Report r, FormattedReport fr)
 	{
+		Map<String, String> settings = fr.appSettings;
+		
+		if ( settings.containsKey("city") || settings.containsKey("location") || settings.containsKey("country") || settings.containsKey("latitude") || settings.containsKey("longitude") )
+		{
+			Location l = new Location();
+			l.city = settings.get("city");
+			l.country = settings.get("country");
+			l.name = settings.get("location");
+			
+			if ( settings.containsKey("latitude") ) {
+				l.latitude = Double.parseDouble( settings.get("latitude") );
+			}
+
+			if ( settings.containsKey("longitude") ) {
+				l.longitude = Double.parseDouble( settings.get("longitude") );
+			}
+			
+			settings.remove("city");
+			settings.remove("country");
+			settings.remove("location");
+			settings.remove("latitude");
+			settings.remove("longitude");
+			
+			fr.locations.add(l);
+		}
 	}
 	
-	private static void populate(List<Integer> l, Pattern regex, String value)
+	
+	private static final void process(String setting, String key, String value, FormattedReport fr)
 	{
-		Matcher m = regex.matcher(value);
+		if ( !PATTERNS.containsKey(key) )
+		{
+			String toCompile = key+"\"\\s*,\\s*QVariant\\(\\w+,\\s+[a-zA-Z_0-9-]+";
+			PATTERNS.put( key, Pattern.compile(toCompile, Pattern.CASE_INSENSITIVE) );
+		}
+		
+		Pattern p = PATTERNS.get(key);
+		Matcher m = p.matcher(value);
 		while ( m.find() )
 		{
 			String result = value.substring( m.start(), m.end() );
-			result = result.substring( result.lastIndexOf(" ")+1 );
-			l.add( Integer.parseInt(result) );
+			result = result.split(", ")[2];
+			
+			if ( result.equals("false") ) {
+				result = "0";
+			} else if ( result.equals("true") ) {
+				result = "1";
+			}
+			
+			fr.appSettings.put(setting+"_"+key, result);
 		}
 	}
 
 	@Override
-	public String consumeSetting(String key, String value)
+	public String consumeSetting(String key, String value, FormattedReport fr)
 	{
-		if ( key.equals("bookmarks") )
-		{
-			List<Integer> chapters = new ArrayList<Integer>();
-			List<Integer> verses = new ArrayList<Integer>();
-			
-			populate(chapters, surahRegex, value);
-			populate(verses, verseRegex, value);
-			
-			if ( chapters.size() != verses.size() ) {
-				throw new IllegalArgumentException("Mismatched bookmarks: "+chapters.size()+", "+verses.size() );
-			}
-			
-			for (int i = 0; i < chapters.size(); i++)
-			{
-				Bookmark b = new Bookmark( chapters.get(i), verses.get(i) );
-				m_bookmarks.add(b);
+		if ( EXCLUDED_SETTINGS.contains(key) ) {
+			return null;
+		} else if ( key.equals("adjustments") ) {
+			process(key, "asr", value, fr);
+			process(key, "dhuhr", value, fr);
+			process(key, "sunrise", value, fr);
+			process(key, "fajr", value, fr);
+			process(key, "isha", value, fr);
+			process(key, "maghrib", value, fr);
+			process(key, "halfNight", value, fr);
+			process(key, "lastThirdNight", value, fr);
+
+			return null;
+		} else if ( key.equals("notifications") || key.equals("athaans") ) {
+			process(key, "asr", value, fr);
+			process(key, "dhuhr", value, fr);
+			process(key, "sunrise", value, fr);
+			process(key, "fajr", value, fr);
+			process(key, "isha", value, fr);
+			process(key, "maghrib", value, fr);
+			process(key, "halfNight", value, fr);
+			process(key, "lastThirdNight", value, fr);
+
+			return null;
+		} else if ( key.equals("profiles") ) {
+			for (int i = 1; i <= 5; i++) {
+				process(key, String.valueOf(i), value, fr );
 			}
 
 			return null;
-		}
-		
-		else {
+		} else {
 			return value;
 		}
 	}

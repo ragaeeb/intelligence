@@ -1,11 +1,12 @@
 package com.canadainc.intelligence.client;
 
-public class Bookmark
+public class QuranBookmark
 {
 	public int chapter;
 	public int verse;
+	public String name = new String();
 
-	public Bookmark(int chapter, int verse)
+	public QuranBookmark(int chapter, int verse)
 	{
 		this.chapter = chapter;
 		this.verse = verse;
@@ -19,8 +20,8 @@ public class Bookmark
 	@Override
 	public boolean equals(Object obj)
 	{
-		if (obj instanceof Bookmark) {
-			Bookmark b = (Bookmark)obj;
+		if (obj instanceof QuranBookmark) {
+			QuranBookmark b = (QuranBookmark)obj;
 			return b.chapter == chapter && b.verse == verse;
 		} else {
 			return false;
