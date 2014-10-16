@@ -1,5 +1,9 @@
 package com.canadainc.intelligence.client;
 
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -15,40 +19,6 @@ import com.canadainc.intelligence.model.Report;
 public class QuranConsumer implements Consumer
 {
 	private static Collection<String> EXCLUDED_SETTINGS = new HashSet<String>();
-	private final Pattern surahRegex = Pattern.compile("surah_id\", QVariant\\(int,\\s+\\d{1,3}");
-	private final Pattern verseRegex = Pattern.compile("verse_id\"\\s+,\\s+QVariant\\(int,\\s+\\d{1,3}");
-	private final Pattern searchSurahNameRegex = Pattern.compile("QString, \"SELECT surah_id,arabic_name[^\n]+");
-	private final Pattern openSurahRegex = Pattern.compile("QString, \"SELECT arabic_uthmani.text as arabic,arabic_uthmani.verse_id[^\n]+");
-	private final Pattern openSurahRegexTransliteration = Pattern.compile("QString, \"SELECT transliteration.text as arabic,transliteration.verse_id[^\n]+");
-	private final Pattern tafsirInterestRegex = Pattern.compile("QString, \"SELECT id,description,verse_id,explainer[^\n]+");
-	private final Pattern tafsirVisitedRegex = Pattern.compile("QString, \"SELECT \\* from tafsir_[^\n]+");
-	private Collection<QuranBookmark> m_bookmarks = new HashSet<QuranBookmark>();
-	private List<QuranBookmark> m_homescreens = new ArrayList<QuranBookmark>();
-	public List<QuranBookmark> getHomescreens() {
-		return m_homescreens;
-	}
-
-	private List<QuranPlaylist> m_playlists = new ArrayList<QuranPlaylist>();
-	private List<Integer> m_chaptersVisited = new ArrayList<Integer>();
-	private List<Integer> m_tafsirInterested = new ArrayList<Integer>();
-	private List<Integer> m_tafsirVisited = new ArrayList<Integer>();
-
-	public List<Integer> getTafsirVisited() {
-		return m_tafsirVisited;
-	}
-
-	public List<Integer> getTafsirInterested() {
-		return m_tafsirInterested;
-	}
-
-	public List<Integer> getChaptersVisited() {
-		return m_chaptersVisited;
-	}
-
-	public List<QuranPlaylist> getPlaylists() {
-		return m_playlists;
-	}
-
 	static {
 		EXCLUDED_SETTINGS.add("alFurqanAdvertised");
 		EXCLUDED_SETTINGS.add("firstTime");
@@ -56,14 +26,29 @@ public class QuranConsumer implements Consumer
 		EXCLUDED_SETTINGS.add("tafsirTutorialCount");
 	}
 
-	public Collection<QuranBookmark> getBookmarks() {
-		return m_bookmarks;
-	}
+	private Collection<QuranBookmark> m_bookmarks = new HashSet<QuranBookmark>();
+	private List<Integer> m_chaptersVisited = new ArrayList<Integer>();
+	private List<QuranBookmark> m_homescreens = new ArrayList<QuranBookmark>();
+	private List<QuranPlaylist> m_playlists = new ArrayList<QuranPlaylist>();
+	private List<Integer> m_tafsirInterested = new ArrayList<Integer>();
+	private List<Integer> m_tafsirVisited = new ArrayList<Integer>();
+	private final Pattern openSurahRegex = Pattern.compile("QString, \"SELECT arabic_uthmani.text as arabic,arabic_uthmani.verse_id[^\n]+");
+
+	private final Pattern openSurahRegexTransliteration = Pattern.compile("QString, \"SELECT transliteration.text as arabic,transliteration.verse_id[^\n]+");
+	private final Pattern searchSurahNameRegex = Pattern.compile("QString, \"SELECT surah_id,arabic_name[^\n]+");
+	private final Pattern surahRegex = Pattern.compile("surah_id\", QVariant\\(int,\\s+\\d{1,3}");
+	private final Pattern tafsirInterestRegex = Pattern.compile("QString, \"SELECT id,description,verse_id,explainer[^\n]+");
+
+	private final Pattern tafsirVisitedRegex = Pattern.compile("QString, \"SELECT \\* from tafsir_[^\n]+");
+
+	private final Pattern verseRegex = Pattern.compile("verse_id\"\\s+,\\s+QVariant\\(int,\\s+\\d{1,3}");
+	private Connection m_connection;
 
 	public QuranConsumer()
 	{
 	}
-
+	
+	
 	@Override
 	public void consume(Report r, FormattedReport fr)
 	{
@@ -75,7 +60,7 @@ public class QuranConsumer implements Consumer
 			{
 				String[] tokens = playlist.split(" ");
 
-				QuranPlaylist qp = new QuranPlaylist( Integer.parseInt(tokens[0]), Integer.parseInt(tokens[1]), Integer.parseInt(tokens[2]) );
+				QuranPlaylist qp = new QuranPlaylist( Integer.parseInt(tokens[0]), Integer.parseInt(tokens[1]), Integer.parseInt(tokens[0]), Integer.parseInt(tokens[2]) );
 				m_playlists.add(qp);
 			}
 			
@@ -162,17 +147,6 @@ public class QuranConsumer implements Consumer
 		}
 	}
 
-	private static void populate(List<Integer> l, Pattern regex, String value)
-	{
-		Matcher m = regex.matcher(value);
-		while ( m.find() )
-		{
-			String result = value.substring( m.start(), m.end() );
-			result = result.substring( result.lastIndexOf(" ")+1 );
-			l.add( Integer.parseInt(result) );
-		}
-	}
-
 	@Override
 	public String consumeSetting(String key, String value, FormattedReport fr)
 	{
@@ -202,20 +176,184 @@ public class QuranConsumer implements Consumer
 			return value;
 		}
 	}
+
+	public Collection<QuranBookmark> getBookmarks() {
+		return m_bookmarks;
+	}
+
+	public List<Integer> getChaptersVisited() {
+		return m_chaptersVisited;
+	}
+
+	public List<QuranBookmark> getHomescreens() {
+		return m_homescreens;
+	}
+
+	public List<QuranPlaylist> getPlaylists() {
+		return m_playlists;
+	}
+
+	public List<Integer> getTafsirInterested() {
+		return m_tafsirInterested;
+	}
 	
+	
+	public List<Integer> getTafsirVisited() {
+		return m_tafsirVisited;
+	}
+
+
+	@Override
+	public void save(FormattedReport fr)
+	{
+		try {
+			PreparedStatement ps;
+			
+			if ( !m_bookmarks.isEmpty() )
+			{
+				ps = m_connection.prepareStatement( "INSERT OR IGNORE INTO quran10_bookmarks (report_id,surah_id,verse_id,name) VALUES (?,?,?,?)");
+				for (QuranBookmark qb: m_bookmarks)
+				{
+					int i = 0;
+					ps.setLong(++i, fr.id);
+					ps.setInt(++i, qb.chapter);
+					ps.setInt(++i, qb.verse);
+					ps.setString(++i, qb.name);
+					
+					ps.executeUpdate();
+				}
+			}
+			
+			if ( !m_homescreens.isEmpty() )
+			{
+				ps = m_connection.prepareStatement( "INSERT OR IGNORE INTO quran10_homescreen (report_id,surah_id,verse_id,name) VALUES (?,?,?,?)");
+				for (QuranBookmark qb: m_homescreens)
+				{
+					int i = 0;
+					ps.setLong(++i, fr.id);
+					ps.setInt(++i, qb.chapter);
+					ps.setInt(++i, qb.verse);
+					ps.setString(++i, qb.name);
+					ps.executeUpdate();
+				}
+			}
+
+			if ( !m_playlists.isEmpty() )
+			{
+				ps = m_connection.prepareStatement( "INSERT OR IGNORE INTO quran10_playlists (report_id, surah_id_start, verse_id_start, surah_id_end, verse_id_end) VALUES (?,?,?,?,?)");
+				for (QuranPlaylist qb: m_playlists)
+				{
+					int i = 0;
+					ps.setLong(++i, fr.id);
+					ps.setInt(++i, qb.fromChapter);
+					ps.setInt(++i, qb.fromVerse);
+					ps.setInt(++i, qb.toChapter);
+					ps.setInt(++i, qb.toVerse);
+					
+					ps.executeUpdate();
+				}
+			}
+			
+			if ( !m_tafsirVisited.isEmpty() )
+			{
+				ps = m_connection.prepareStatement( "INSERT OR IGNORE INTO quran10_tafsir_visited (report_id,tafsir_id) VALUES (?,?)");
+				for (Integer qb: m_tafsirVisited)
+				{
+					int i = 0;
+					ps.setLong(++i, fr.id);
+					ps.setInt(++i, qb);
+					ps.executeUpdate();
+				}
+			}
+			
+			if ( !m_tafsirInterested.isEmpty() )
+			{
+				ps = m_connection.prepareStatement( "INSERT OR IGNORE INTO quran10_tafsir_interest (report_id,tafsir_id) VALUES (?,?)");
+				for (Integer qb: m_tafsirInterested)
+				{
+					int i = 0;
+					ps.setLong(++i, fr.id);
+					ps.setInt(++i, qb);
+					ps.executeUpdate();
+				}
+			}
+			
+			if ( !m_chaptersVisited.isEmpty() )
+			{
+				ps = m_connection.prepareStatement( "INSERT OR IGNORE INTO quran10_chapters_visited (report_id,chapter_id) VALUES (?,?)");
+				for (Integer qb: m_chaptersVisited)
+				{
+					int i = 0;
+					ps.setLong(++i, fr.id);
+					ps.setInt(++i, qb);
+					ps.executeUpdate();
+				}
+			}
+		} catch (Exception ex) {
+			ex.printStackTrace();
+			try {
+				m_connection.rollback();
+			} catch (SQLException e) {
+				e.printStackTrace();
+			}
+		} finally {
+			try {
+				m_connection.commit();
+			} catch (SQLException e) {
+				e.printStackTrace();
+			}
+		}
+	}
+	
+	private static void populate(List<Integer> l, Pattern regex, String value)
+	{
+		Matcher m = regex.matcher(value);
+		while ( m.find() )
+		{
+			String result = value.substring( m.start(), m.end() );
+			result = result.substring( result.lastIndexOf(" ")+1 );
+			l.add( Integer.parseInt(result) );
+		}
+	}
 	
 	public class QuranPlaylist
 	{
-		public int chapter;
+		public int fromChapter;
 		public int fromVerse;
+		public int toChapter;
 		public int toVerse;
 
-		public QuranPlaylist(int chapter, int fromVerse, int toVerse) {
-			super();
-			this.chapter = chapter;
+		public QuranPlaylist(int chapter, int fromVerse, int toChapter, int toVerse)
+		{
+			this.fromChapter = chapter;
 			this.fromVerse = fromVerse;
+			this.toChapter = toChapter;
 			this.toVerse = toVerse;
 		}
 	}
 
+	@Override
+	public void setPath(String path) throws Exception
+	{
+		if (m_connection != null) {
+			m_connection.close();
+		}
+		
+		m_connection = DriverManager.getConnection("jdbc:sqlite:"+path);
+		m_connection.setAutoCommit(false);
+	}
+	
+	
+	@Override
+	public void close() throws SQLException
+	{
+		m_connection.close();
+	}
+
+
+	@Override
+	public Connection getConnection()
+	{
+		return m_connection;
+	}
 }

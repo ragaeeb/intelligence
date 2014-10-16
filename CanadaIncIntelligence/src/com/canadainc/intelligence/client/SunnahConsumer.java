@@ -1,5 +1,9 @@
 package com.canadainc.intelligence.client;
 
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -8,54 +12,81 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import com.canadainc.common.text.TextUtils;
+import com.canadainc.intelligence.client.QuranConsumer.QuranPlaylist;
 import com.canadainc.intelligence.model.FormattedReport;
 import com.canadainc.intelligence.model.InAppSearch;
 import com.canadainc.intelligence.model.Report;
 
 public class SunnahConsumer implements Consumer
 {
+	private static final String EMAIL_ADDRESS_SUFFIX = ";expected_value";
+	private static final String EMAIL_ADDRESS_PREFIX = "email_address:";
+
+
+	public class SunnahBook
+	{
+		public int bookID;
+		public String collection;
+
+		public SunnahBook(String collection, int bookID) {
+			super();
+			this.collection = collection;
+			this.bookID = bookID;
+		}
+	}
+	public class SunnahShortcut
+	{
+		public long id;
+		public String name = new String();
+		boolean isTafsir;
+		public SunnahShortcut(String name, long id, boolean isTafsir) {
+			super();
+			this.name = name;
+			this.id = id;
+			this.isTafsir = isTafsir;
+		}
+	}
 	private static Collection<String> EXCLUDED_SETTINGS = new HashSet<String>();
 	private static final Pattern invokeRegex = Pattern.compile("invoked\\s+\"bb.action[^\n]+", Pattern.CASE_INSENSITIVE);
-	private List<Integer> visitedNarrationIds = new ArrayList<Integer>();
-	private List<Long> visitedTafsirIds = new ArrayList<Long>();
-	private List<SunnahShortcut> m_homescreens = new ArrayList<SunnahShortcut>();
-	public List<SunnahShortcut> getHomescreens() {
-		return m_homescreens;
-	}
-
-	public List<Long> getVisitedTafsirIds() {
-		return visitedTafsirIds;
-	}
-
-	public List<Integer> getVisitedNarrationIds() {
-		return visitedNarrationIds;
-	}
-
-	public void setVisitedNarrationIds(List<Integer> visitedNarrationIds) {
-		this.visitedNarrationIds = visitedNarrationIds;
-	}
-
-	private List<SunnahHadith> visitedNarrationCollections = new ArrayList<SunnahHadith>();
-	private List<SunnahBook> visitedBooks = new ArrayList<SunnahBook>();
-
-	public List<SunnahBook> getVisitedBooks() {
-		return visitedBooks;
-	}
-
 	static {
 		EXCLUDED_SETTINGS.add("alFurqanAdvertised");
 		EXCLUDED_SETTINGS.add("dbVersion");
 		EXCLUDED_SETTINGS.add("lastUpdateCheck");
 	}
+	private Connection m_connection;
+	private List<SunnahShortcut> m_homescreens = new ArrayList<SunnahShortcut>();
+
+	private List<SunnahBook> visitedBooks = new ArrayList<SunnahBook>();
+
+	private List<SunnahHadith> visitedNarrationCollections = new ArrayList<SunnahHadith>();
+
+	private List<Integer> visitedNarrationIds = new ArrayList<Integer>();
+
+	private List<Long> visitedTafsirIds = new ArrayList<Long>();
+	private String m_databasePath;
 
 	public SunnahConsumer()
 	{
 	}
 
+	@Override
+	public void close() throws SQLException
+	{
+		m_connection.close();
+	}
 
 	@Override
 	public void consume(Report r, FormattedReport fr)
 	{
+		if ( r.deviceInfo.contains("Notes: mistake_type") ) // mistake submission
+		{
+			int start = r.deviceInfo.indexOf(EMAIL_ADDRESS_PREFIX);
+			int end = r.deviceInfo.indexOf(EMAIL_ADDRESS_SUFFIX);
+			
+			String email = r.deviceInfo.substring( start+EMAIL_ADDRESS_PREFIX.length(), end);
+			fr.userInfo.emails.add(email);
+		}
+		
 		for (String log: r.logs)
 		{
 			List<String> result = TextUtils.getValues("fetchHadith", log);
@@ -64,7 +95,7 @@ public class SunnahConsumer implements Consumer
 				String[] tokens = query.split(" ");
 
 				if (tokens.length > 1) { // fetch hadith by collection name
-					SunnahHadith s = new SunnahHadith(tokens[0], tokens[1]);
+					SunnahHadith s = new SunnahHadith( TextUtils.removeQuotes(tokens[0]), TextUtils.removeQuotes(tokens[1]) );
 					visitedNarrationCollections.add(s);
 				} else { // fetch hadith by ID
 					visitedNarrationIds.add( Integer.parseInt(tokens[0]) );
@@ -107,6 +138,16 @@ public class SunnahConsumer implements Consumer
 					name = "standard";
 				}
 				
+				if ( andMode.equals("true") ) {
+					name += "_and";
+				} else {
+					name += "_or";
+				}
+				
+				if ( shortNarrations.equals("true") ) {
+					name += "_short";
+				}
+				
 				InAppSearch ias = new InAppSearch( name, additional.toString() );
 				
 				if ( !excludedCollections.isEmpty() ) {
@@ -117,7 +158,13 @@ public class SunnahConsumer implements Consumer
 			}
 
 			result = TextUtils.getValues("fetchTafsirContent", log);
-			for (String query: result) {
+			for (String query: result)
+			{
+				if ( query.contains(" ") ) {
+					String[] tokens = query.split(" ");
+					query = tokens[tokens.length-1];
+				}
+				
 				visitedTafsirIds.add( Long.parseLong(query) );
 			}
 
@@ -126,7 +173,7 @@ public class SunnahConsumer implements Consumer
 			{
 				String[] tokens = query.split(" ");
 
-				SunnahBook s = new SunnahBook( tokens[0], Integer.parseInt( tokens[1] ) );
+				SunnahBook s = new SunnahBook( TextUtils.removeQuotes(tokens[0]), Integer.parseInt( tokens[1] ) );
 				visitedBooks.add(s);
 			}
 
@@ -150,6 +197,15 @@ public class SunnahConsumer implements Consumer
 				m_homescreens.add(s);
 			}
 		}
+		
+		for (String asset: r.assets)
+		{
+			if ( asset.endsWith("bookmarks.db") )
+			{
+				m_databasePath = asset;
+				break;
+			}
+		}
 	}
 
 	@Override
@@ -161,31 +217,146 @@ public class SunnahConsumer implements Consumer
 			return value;
 		}
 	}
-	
-	
-	public class SunnahShortcut
+
+
+	@Override
+	public Connection getConnection()
 	{
-		public String name = new String();
-		public long id;
-		public SunnahShortcut(String name, long id, boolean isTafsir) {
-			super();
-			this.name = name;
-			this.id = id;
-			this.isTafsir = isTafsir;
-		}
-		boolean isTafsir;
+		return m_connection;
+	}
+
+	public List<SunnahShortcut> getHomescreens() {
+		return m_homescreens;
 	}
 	
 	
-	public class SunnahBook
-	{
-		public String collection;
-		public int bookID;
+	public List<SunnahBook> getVisitedBooks() {
+		return visitedBooks;
+	}
+	
+	
+	public List<Integer> getVisitedNarrationIds() {
+		return visitedNarrationIds;
+	}
 
-		public SunnahBook(String collection, int bookID) {
-			super();
-			this.collection = collection;
-			this.bookID = bookID;
+
+	public List<Long> getVisitedTafsirIds() {
+		return visitedTafsirIds;
+	}
+
+	@Override
+	public void save(FormattedReport fr)
+	{
+		try {
+			PreparedStatement ps;
+			
+			if ( !visitedBooks.isEmpty() )
+			{
+				ps = m_connection.prepareStatement( "INSERT OR IGNORE INTO sunnah10_visited_books (report_id,book_id,collection) VALUES (?,?,?)");
+				for (SunnahBook qb: visitedBooks)
+				{
+					int i = 0;
+					ps.setLong(++i, fr.id);
+					ps.setInt(++i, qb.bookID);
+					ps.setString(++i, qb.collection);
+					
+					ps.executeUpdate();
+				}
+			}
+			
+			if ( !m_homescreens.isEmpty() )
+			{
+				ps = m_connection.prepareStatement( "INSERT OR IGNORE INTO sunnah10_homescreen (report_id,id,name,isTafsir) VALUES (?,?,?,?)");
+				for (SunnahShortcut qb: m_homescreens)
+				{
+					int i = 0;
+					ps.setLong(++i, fr.id);
+					ps.setLong(++i, qb.id);
+					ps.setString(++i, qb.name);
+					ps.setInt(++i, qb.isTafsir ? 1 : 0);
+					ps.executeUpdate();
+				}
+			}
+
+			if ( !visitedNarrationCollections.isEmpty() )
+			{
+				ps = m_connection.prepareStatement( "INSERT OR IGNORE INTO sunnah10_visited_narrations (report_id, collection, hadith_number) VALUES (?,?,?)");
+				for (SunnahHadith qb: visitedNarrationCollections)
+				{
+					int i = 0;
+					ps.setLong(++i, fr.id);
+					ps.setString(++i, qb.collection);
+					ps.setString(++i, qb.hadithNumber);
+					
+					ps.executeUpdate();
+				}
+			}
+			
+			if ( !visitedNarrationIds.isEmpty() )
+			{
+				ps = m_connection.prepareStatement( "INSERT OR IGNORE INTO sunnah10_visited_narrations (report_id, hadith_id) VALUES (?,?)");
+				for (Integer qb: visitedNarrationIds)
+				{
+					int i = 0;
+					ps.setLong(++i, fr.id);
+					ps.setInt(++i, qb);
+					ps.executeUpdate();
+				}
+			}
+			
+			if ( !visitedTafsirIds.isEmpty() )
+			{
+				ps = m_connection.prepareStatement( "INSERT OR IGNORE INTO sunnah10_visited_tafsir (report_id,tafsir_id) VALUES (?,?)");
+				for (Long qb: visitedTafsirIds)
+				{
+					int i = 0;
+					ps.setLong(++i, fr.id);
+					ps.setLong(++i, qb);
+					ps.executeUpdate();
+				}
+			}
+			
+			if (m_databasePath != null)
+			{
+				m_connection.setAutoCommit(true);
+				ps = m_connection.prepareStatement("ATTACH DATABASE '"+m_databasePath+"' AS 'source'");
+				ps.execute();
+
+				ps = m_connection.prepareStatement("INSERT OR IGNORE INTO bookmarks SELECT "+fr.id+",aid,tag,timestamp FROM source.bookmarks");
+				ps.execute();
+
+				ps = m_connection.prepareStatement("INSERT OR IGNORE INTO bookmarked_tafsir SELECT "+fr.id+",tid,tag,timestamp FROM source.bookmarked_tafsir");
+				ps.execute();
+
+				ps = m_connection.prepareStatement("DETACH DATABASE source");
+				ps.execute();
+				m_connection.setAutoCommit(false);
+			}
+		} catch (Exception ex) {
+			ex.printStackTrace();
+			try {
+				m_connection.rollback();
+			} catch (SQLException e) {
+				e.printStackTrace();
+			}
+		} finally {
+			try {
+				m_connection.commit();
+			} catch (SQLException e) {
+				e.printStackTrace();
+			}
 		}
+	}
+	
+	
+	@Override
+	public void setPath(String path) throws Exception
+	{
+		if (m_connection != null) {
+			m_connection.close();
+		}
+		
+		m_connection = DriverManager.getConnection("jdbc:sqlite:"+path);
+		m_connection.setAutoCommit(false);
 	}
 }

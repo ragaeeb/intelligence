@@ -1,43 +1,63 @@
 CREATE TABLE devices (id INTEGER PRIMARY KEY, machine TEXT UNIQUE, hardware_id TEXT, model_name TEXT, physical_keyboard INTEGER, model_number TEXT, device_memory INTEGER);
 CREATE TABLE operating_systems (id INTEGER PRIMARY KEY, version TEXT, creation_date INTEGER, UNIQUE(version, creation_date) ON CONFLICT IGNORE);
-CREATE TABLE canadainc_apps (id INTEGER PRIMARY KEY, name TEXT NOT NULL, version TEXT NOT NULL, path TEXT, UNIQUE(name, version) ON CONFLICT IGNORE);
-CREATE TABLE locales (id INTEGER PRIMARY KEY, locale TEXT UNIQUE);
+CREATE TABLE canadainc_apps (id INTEGER PRIMARY KEY, name TEXT NOT NULL, version TEXT NOT NULL, UNIQUE(name, version) ON CONFLICT IGNORE);
 
-CREATE TABLE users (id INTEGER PRIMARY KEY, bcm0 TEXT UNIQUE, device_id INTEGER REFERENCES devices(id), node_name TEXT, internal INTEGER, imei TEXT, meid TEXT, pin TEXT, UNIQUE(bcm0,device_id,imei,pin) ON CONFLICT REPLACE);
+CREATE TABLE users (id INTEGER PRIMARY KEY, imei TEXT UNIQUE, meid TEXT UNIQUE, pin TEXT UNIQUE, name TEXT, data TEXT);
 CREATE TABLE user_info (user_id INTEGER REFERENCES users(id), address TEXT UNIQUE ON CONFLICT IGNORE);
 
-CREATE TABLE reports (id INTEGER PRIMARY KEY, app_id INTEGER REFERENCES canadainc_apps(id), locale INTEGER REFERENCES locales(id), user_id INTEGER REFERENCES users(id), os_id INTEGER REFERENCES operating_systems(id), memory_usage INTEGER, available_memory INTEGER, boot_time INTEGER, msm0 TEXT, bcm0 TEXT, battery_temperature INTEGER, battery_level INTEGER, battery_cycle_count INTEGER, battery_charging_state INTEGER, ip TEXT, host TEXT);
+CREATE TABLE reports (id INTEGER PRIMARY KEY, app_id INTEGER REFERENCES canadainc_apps(id), device_id INTEGER REFERENCES devices(id), os_id INTEGER REFERENCES operating_systems(id), locale TEXT, memory_usage INTEGER, available_memory INTEGER, boot_time INTEGER, battery_temperature INTEGER, battery_level INTEGER, battery_cycle_count INTEGER, battery_charging_state INTEGER, total_accounts INTEGER, user_id INTEGER, node_name TEXT, internal INTEGER, bcm0 TEXT, bptp0 TEXT, msm0 TEXT, ip TEXT, host TEXT);
 
 CREATE TABLE geo (id INTEGER PRIMARY KEY, city TEXT, region TEXT, country TEXT, UNIQUE(city, region, country) ON CONFLICT IGNORE);
 CREATE TABLE locations (report_id INTEGER REFERENCES reports(id), latitude REAL, longitude REAL, geo_id INTEGER REFERENCES geo(id), name TEXT);
 
-CREATE TABLE bbworld_apps (id INTEGER PRIMARY KEY, name TEXT, sku TEXT, vendor TEXT, icon_uri TEXT);
-CREATE TABLE device_apps (id INTEGER PRIMARY KEY, package_name TEXT, package_id TEXT, bbworld_id INTEGER REFERENCES bbworld_apps(id) DEFAULT 0);
+CREATE TABLE device_apps (id INTEGER PRIMARY KEY, package_name TEXT, version TEXT, bbw_id INTEGER, bbw_content_id INTEGER, bbw_name TEXT, bbw_sku TEXT, bbw_vendor TEXT, bbw_icon_uri TEXT, UNIQUE(package_name,version) ON CONFLICT IGNORE);
 CREATE TABLE removed_apps (report_id INTEGER REFERENCES reports(id), device_app_id INTEGER REFERENCES device_apps(id));
 
 CREATE TABLE database_stats (report_id INTEGER REFERENCES reports(id), query_id INTEGER, duration INTEGER, num_elements INTEGER);
 CREATE TABLE user_events (id INTEGER PRIMARY KEY, event TEXT UNIQUE);
 CREATE TABLE app_user_events (report_id INTEGER REFERENCES reports(id), user_event_id INTEGER REFERENCES user_events(id));
-CREATE TABLE app_settings (app_id INTEGER REFERENCES apps(id), setting_key TEXT, UNIQUE(app_id, setting_key) ON CONFLICT IGNORE);
+CREATE TABLE app_settings (id INTEGER PRIMARY KEY, setting_key TEXT UNIQUE);
 CREATE TABLE report_app_settings (report_id INTEGER REFERENCES reports(id), app_setting_id INTEGER REFERENCES app_settings(id), setting_value TEXT);
 
 CREATE TABLE accounts_selected(report_id INTEGER REFERENCES reports(id), account_id INTEGER);
 CREATE TABLE bulk_operations(report_id INTEGER REFERENCES reports(id), type TEXT, count INTEGER);
-CREATE TABLE conversations_fetched(report_id INTEGER REFERENCES reports(id), count INTEGER);
-CREATE TABLE elements_fetched(report_id INTEGER REFERENCES reports(id), count INTEGER);
+CREATE TABLE elements_fetched(report_id INTEGER REFERENCES reports(id), type TEXT, count INTEGER);
 CREATE TABLE in_app_searches(report_id INTEGER REFERENCES reports(id), name TEXT, query_value TEXT);
 CREATE TABLE invoke_targets(report_id INTEGER REFERENCES reports(id), target_id TEXT, uri TEXT, data TEXT);
-CREATE TABLE total_accounts(report_id INTEGER REFERENCES reports(id), total INTEGER);
 
+
+
+golden:
+CREATE TABLE IF NOT EXISTS logs(report_id INTEGER REFERENCES reports(id), command INTEGER, reply TEXT, timestamp INTEGER);
+
+
+autoblock:
+CREATE TABLE IF NOT EXISTS inbound_blacklist(report_id INTEGER REFERENCES reports(id), address TEXT, count INTEGER);
+CREATE TABLE IF NOT EXISTS inbound_keywords(report_id INTEGER REFERENCES reports(id), term TEXT, count INTEGER);
+CREATE TABLE IF NOT EXISTS logs(report_id INTEGER REFERENCES reports(id), address TEXT, message TEXT, timestamp INTEGER);
+CREATE TABLE IF NOT EXISTS outbound_blacklist(report_id INTEGER REFERENCES reports(id), address TEXT, count INTEGER);
 
 oct:
-CREATE TABLE oct_routes_accessed(report_id INTEGER REFERENCES reports(id), stop_number INTEGER, route_number INTEGER, timestamp INTEGER);
+CREATE TABLE oct_routes_accessed(report_id INTEGER REFERENCES reports(id), stop_code INTEGER, name TEXT);
+
+safebrowse:
+CREATE TABLE safe_browse_homescreen(report_id INTEGER REFERENCES reports(id), uri TEXT, name TEXT);
+CREATE TABLE IF NOT EXISTS controlled(report_id INTEGER REFERENCES reports(id), uri TEXT);
+CREATE TABLE IF NOT EXISTS passive(report_id INTEGER REFERENCES reports(id), uri TEXT);
+CREATE TABLE IF NOT EXISTS keywords(report_id INTEGER REFERENCES reports(id), term TEXT);
 
 sunnah10:
-CREATE TABLE sunnah10_bookmarks(report_id INTEGER REFERENCES reports(id), arabic_id INTEGER, UNIQUE(report_id, arabic_id) ON CONFLICT IGNORE);
-CREATE TABLE sunnah10_collections_accessed(report_id INTEGER REFERENCES reports(id), collection_name TEXT);
-CREATE TABLE sunnah10_narrations_accessed(report_id INTEGER REFERENCES reports(id), arabic_id INTEGER);
+CREATE TABLE bookmarks(report_id INTEGER REFERENCES reports(id), aid INTEGER, tag TEXT, timestamp INTEGER);
+CREATE TABLE bookmarked_tafsir(report_id INTEGER REFERENCES reports(id), tid INTEGER, tag TEXT, timestamp INTEGER);
+CREATE TABLE sunnah10_visited_books(report_id INTEGER REFERENCES reports(id), book_id INTEGER, collection TEXT);
+CREATE TABLE sunnah10_homescreen(report_id INTEGER REFERENCES reports(id), id INTEGER, name TEXT, isTafsir INTEGER);
+CREATE TABLE sunnah10_visited_narrations(report_id INTEGER REFERENCES reports(id), hadith_id INTEGER, collection TEXT, hadith_number TEXT);
+CREATE TABLE sunnah10_visited_tafsir(report_id INTEGER REFERENCES reports(id), tafsir_id INTEGER);
 
 quran10:
-CREATE TABLE quran10_bookmarks(report_id INTEGER REFERENCES reports(id), surah_id INTEGER, verse_id INTEGER, UNIQUE(report_id, surah_id, verse_id) ON CONFLICT IGNORE);
-CREATE TABLE quran10_playlists(report_id INTEGER REFERENCES reports(id), surah_id INTEGER, verse_id_start INTEGER, verse_id_end INTEGER);
+CREATE TABLE quran10_bookmarks(report_id INTEGER REFERENCES reports(id), surah_id INTEGER, verse_id INTEGER, name TEXT, UNIQUE(report_id, surah_id, verse_id) ON CONFLICT IGNORE);
+CREATE TABLE quran10_chapters_visited(report_id INTEGER REFERENCES reports(id), chapter_id INTEGER);
+CREATE TABLE quran10_homescreen(report_id INTEGER REFERENCES reports(id), surah_id INTEGER, verse_id INTEGER, name TEXT, UNIQUE(report_id, surah_id, verse_id) ON CONFLICT IGNORE);
+CREATE TABLE quran10_playlists(report_id INTEGER REFERENCES reports(id), surah_id_start INTEGER, verse_id_start INTEGER, surah_id_end INTEGER, verse_id_end INTEGER);
+CREATE TABLE quran10_tafsir_interest(report_id INTEGER REFERENCES reports(id), tafsir_id INTEGER);
+CREATE TABLE quran10_tafsir_visited(report_id INTEGER REFERENCES reports(id), tafsir_id INTEGER);

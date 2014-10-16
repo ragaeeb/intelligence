@@ -102,6 +102,18 @@ public class ReportCollectorTest
 	
 	
 	@Test
+	public void testRunMultiFolder() throws IOException
+	{
+		m_instance = new ReportCollector();
+		Collection<String> folders = new HashSet<String>();
+		folders.add("res/multi_folder");
+		m_instance.setFolders(folders);
+		
+		Collection<Report> reports = m_instance.run();
+	}
+	
+	
+	@Test
 	public void testRunSunnah10Folder()
 	{
 		m_instance = new ReportCollector();

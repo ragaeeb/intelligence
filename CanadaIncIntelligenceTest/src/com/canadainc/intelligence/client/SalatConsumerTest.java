@@ -25,9 +25,8 @@ public class SalatConsumerTest
 	@Test
 	public void testConsumeSetting() throws IOException
 	{
-		SalatConsumer instance = new SalatConsumer();
-		Map<String,Consumer> consumers = new HashMap<String,Consumer>();
-		consumers.put("Salat10", instance);
+		Map<String,String> consumers = new HashMap<String,String>();
+		consumers.put("Salat10", "com.canadainc.intelligence.client.SalatConsumer");
 
 		Report r = ReportCollector.extractReport( new File("res/salat10/1401895045955") );
 		ReportAnalyzer ra = new ReportAnalyzer();
@@ -54,9 +53,8 @@ public class SalatConsumerTest
 	@Test
 	public void testConsumeSettingProfiles() throws IOException
 	{
-		SalatConsumer instance = new SalatConsumer();
-		Map<String,Consumer> consumers = new HashMap<String,Consumer>();
-		consumers.put("Salat10", instance);
+		Map<String,String> consumers = new HashMap<String,String>();
+		consumers.put("Salat10", "com.canadainc.intelligence.client.SalatConsumer");
 
 		Report r = ReportCollector.extractReport( new File("res/salat10/1404042526979") );
 		ReportAnalyzer ra = new ReportAnalyzer();

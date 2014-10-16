@@ -1,5 +1,8 @@
 package com.canadainc.intelligence.client;
 
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -30,6 +33,14 @@ public class SalatConsumer implements Consumer
 	public SalatConsumer()
 	{
 	}
+	
+	
+	private String extract(Map<String, String> settings, String key)
+	{
+		String value = settings.get(key);
+		return value == null ? "" : value;
+	}
+	
 
 	@Override
 	public void consume(Report r, FormattedReport fr)
@@ -38,17 +49,23 @@ public class SalatConsumer implements Consumer
 		
 		if ( settings.containsKey("city") || settings.containsKey("location") || settings.containsKey("country") || settings.containsKey("latitude") || settings.containsKey("longitude") )
 		{
-			Location l = new Location();
-			l.city = settings.get("city");
-			l.country = settings.get("country");
-			l.name = settings.get("location");
+			String city = extract(settings, "city");
+			String country = extract(settings, "country");
+			String name = extract(settings, "location");
+			String latitude = settings.get("latitude");
+			String longitude = settings.get("longitude");
 			
-			if ( settings.containsKey("latitude") ) {
-				l.latitude = Double.parseDouble( settings.get("latitude") );
+			Location l = new Location();
+			l.city = city;
+			l.country = country;
+			l.name = name;
+
+			if ( latitude != null && !latitude.isEmpty() && !latitude.equals("nan") ) {
+				l.latitude = Double.parseDouble(latitude);
 			}
 
-			if ( settings.containsKey("longitude") ) {
-				l.longitude = Double.parseDouble( settings.get("longitude") );
+			if ( longitude != null && !longitude.isEmpty() && !longitude.equals("nan") ) {
+				l.longitude = Double.parseDouble(longitude);
 			}
 			
 			settings.remove("city");
@@ -123,5 +140,27 @@ public class SalatConsumer implements Consumer
 		} else {
 			return value;
 		}
+	}
+
+	@Override
+	public void save(FormattedReport fr)
+	{
+	}
+
+	@Override
+	public void setPath(String path) throws Exception
+	{
+	}
+	
+	
+	@Override
+	public void close() throws SQLException
+	{
+	}
+
+	@Override
+	public Connection getConnection()
+	{
+		return null;
 	}
 }

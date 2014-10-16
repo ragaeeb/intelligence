@@ -1,13 +1,16 @@
 package com.canadainc.intelligence.client;
 
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import com.canadainc.common.text.TextUtils;
+import com.canadainc.intelligence.client.SunnahConsumer.SunnahBook;
 import com.canadainc.intelligence.client.SunnahConsumer.SunnahShortcut;
 import com.canadainc.intelligence.model.FormattedReport;
 import com.canadainc.intelligence.model.InAppSearch;
@@ -18,6 +21,7 @@ public class OCTConsumer implements Consumer
 	private static final String STOP_CODE_PATTERN = "stop_code\", QVariant(int, ";
 	private static Collection<String> EXCLUDED_SETTINGS = new HashSet<String>();
 	private List<OCTShortcut> m_homescreens = new ArrayList<OCTShortcut>();
+	private Connection m_connection;
 	public List<OCTShortcut> getHomescreens() {
 		return m_homescreens;
 	}
@@ -104,5 +108,63 @@ public class OCTConsumer implements Consumer
 			this.name = name;
 			this.stopCode = stopCode;
 		}
+	}
+
+	@Override
+	public void save(FormattedReport fr)
+	{
+		try {
+			PreparedStatement ps;
+			
+			if ( !m_homescreens.isEmpty() )
+			{
+				ps = m_connection.prepareStatement( "INSERT OR IGNORE INTO oct_routes_accessed (report_id,stop_code,name) VALUES (?,?,?)");
+				for (OCTShortcut qb: m_homescreens)
+				{
+					int i = 0;
+					ps.setLong(++i, fr.id);
+					ps.setInt(++i, qb.stopCode);
+					ps.setString(++i, qb.name);
+					ps.executeUpdate();
+				}
+			}
+		} catch (Exception ex) {
+			ex.printStackTrace();
+			try {
+				m_connection.rollback();
+			} catch (SQLException e) {
+				e.printStackTrace();
+			}
+		} finally {
+			try {
+				m_connection.commit();
+			} catch (SQLException e) {
+				e.printStackTrace();
+			}
+		}
+	}
+
+	@Override
+	public void setPath(String path) throws Exception
+	{
+		if (m_connection != null) {
+			m_connection.close();
+		}
+		
+		m_connection = DriverManager.getConnection("jdbc:sqlite:"+path);
+		m_connection.setAutoCommit(false);
+	}
+	
+	
+	@Override
+	public void close() throws SQLException
+	{
+		m_connection.close();
+	}
+
+	@Override
+	public Connection getConnection()
+	{
+		return m_connection;
 	}
 }

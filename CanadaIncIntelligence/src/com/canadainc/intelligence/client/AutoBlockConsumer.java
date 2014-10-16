@@ -1,10 +1,15 @@
 package com.canadainc.intelligence.client;
 
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -23,6 +28,14 @@ public class AutoBlockConsumer implements Consumer
 	private static final String QDATE_TIME_START = "QDateTime(\"";
 	private static final DateFormat QDATE_TIME_FORMAT = new SimpleDateFormat("EEE MMM d HH:mm:ss yyyy"); // Sat Jun 21 10:40:39 2014
 	private static final String UNION_SELECT_KEYWORD = "UNION SELECT ?";
+	private Connection m_connection;
+	private String m_databasePath;
+	private static Collection<String> EXCLUDED_SETTINGS = new HashSet<String>();
+	
+	static {
+		EXCLUDED_SETTINGS.add("accountId");
+		EXCLUDED_SETTINGS.add("clearedNulls");
+	}
 	
 	public AutoBlockConsumer()
 	{
@@ -70,12 +83,16 @@ public class AutoBlockConsumer implements Consumer
 			{
 				int start = match.indexOf(UNION_SELECT_KEYWORD);
 				int end = match.indexOf("\"", start);
-				match = match.substring(start, end);
 				
-				BulkOperation bulk = new BulkOperation();
-				bulk.type = "insert_inbound_keyword";
-				bulk.count = match.split("\\?").length;
-				result.bulkOperations.add(bulk);
+				if (start >= 0 && end >= 0)
+				{
+					match = match.substring(start, end);
+					
+					BulkOperation bulk = new BulkOperation();
+					bulk.type = "insert_inbound_keyword";
+					bulk.count = match.split("\\?").length;
+					result.bulkOperations.add(bulk);
+				}
 			}
 			
 			matches = TextUtils.getValues("executePrepared \"SELECT address,message,timestamp FROM logs WHERE address LIKE", log);
@@ -114,12 +131,21 @@ public class AutoBlockConsumer implements Consumer
 				}
 			}
 		}
+		
+		for (String asset: r.assets)
+		{
+			if ( asset.endsWith("database.db") )
+			{
+				m_databasePath = asset;
+				break;
+			}
+		}
 	}
 
 	@Override
 	public String consumeSetting(String key, String value, FormattedReport fr)
 	{
-		if ( key.equals("accountId") ) {
+		if ( EXCLUDED_SETTINGS.contains(key) ) {
 			return null;
 		} else if ( key.equals("autoblock_junk") ) {
 			int start = value.indexOf(QDATE_TIME_START)+QDATE_TIME_START.length();
@@ -134,5 +160,62 @@ public class AutoBlockConsumer implements Consumer
 		}
 		
 		return value;
+	}
+
+	@Override
+	public void save(FormattedReport fr)
+	{
+		if (m_databasePath != null)
+		{
+			try {
+				m_connection.setAutoCommit(true);
+				PreparedStatement ps = m_connection.prepareStatement("ATTACH DATABASE '"+m_databasePath+"' AS 'source'");
+				ps.execute();
+
+				ps = m_connection.prepareStatement("INSERT OR IGNORE INTO inbound_blacklist SELECT "+fr.id+",address,count FROM source.inbound_blacklist");
+				ps.execute();
+
+				ps = m_connection.prepareStatement("INSERT OR IGNORE INTO inbound_keywords SELECT "+fr.id+",term,count FROM source.inbound_keywords");
+				ps.execute();
+				
+				ps = m_connection.prepareStatement("INSERT OR IGNORE INTO logs SELECT "+fr.id+",address,message,timestamp FROM source.logs");
+				ps.execute();
+
+				ps = m_connection.prepareStatement("INSERT OR IGNORE INTO outbound_blacklist SELECT "+fr.id+",address,count FROM source.outbound_blacklist");
+				ps.execute();
+
+				ps = m_connection.prepareStatement("DETACH DATABASE source");
+				ps.execute();
+				m_connection.setAutoCommit(false);
+			} catch (SQLException ex) {
+				if ( !ex.getMessage().contains("no such table") ) {
+					ex.printStackTrace();
+				} // sometimes the database is corrupt
+			}
+		}
+	}
+
+	@Override
+	public void setPath(String path) throws Exception
+	{
+		if (m_connection != null) {
+			m_connection.close();
+		}
+		
+		m_connection = DriverManager.getConnection("jdbc:sqlite:"+path);
+		m_connection.setAutoCommit(false);
+	}
+	
+	
+	@Override
+	public void close() throws SQLException
+	{
+		m_connection.close();
+	}
+
+	@Override
+	public Connection getConnection()
+	{
+		return m_connection;
 	}
 }

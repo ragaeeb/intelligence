@@ -1,7 +1,6 @@
 package com.canadainc.intelligence.io;
 
 import java.io.File;
-import java.io.FileFilter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -10,8 +9,10 @@ import java.util.List;
 import com.canadainc.common.io.IOUtils;
 import com.canadainc.intelligence.model.Report;
 
-public class ReportCollector
+public class ReportCollector implements DataCollector
 {
+	private static final String REPORT_REGEX = "^[0-9]*$";
+	
 	private Collection<String> m_folders;
 
 	public ReportCollector()
@@ -19,6 +20,10 @@ public class ReportCollector
 	}
 
 
+	/* (non-Javadoc)
+	 * @see com.canadainc.intelligence.io.DataCollector#setFolders(java.util.Collection)
+	 */
+	@Override
 	public void setFolders(Collection<String> folders) {
 		m_folders = folders;
 	}
@@ -32,7 +37,7 @@ public class ReportCollector
 		int lastDot = name.lastIndexOf(".");
 		
 		if (lastDot > -1) {
-			name = name.substring( 0, name.lastIndexOf(".") );
+			name = name.substring(0, lastDot);
 		}
 
 		r.timestamp = Long.parseLong(name);
@@ -43,22 +48,25 @@ public class ReportCollector
 
 			for (File asset: assets)
 			{
-				name = asset.getName();
-
-				if ( name.endsWith(".conf") ) {
-					r.settings = IOUtils.readFileUtf8(asset).trim();
-				} else if ( name.endsWith(".log") ) {
-					r.logs.add( IOUtils.readFileUtf8(asset).trim() );
-				} else if ( name.equals("deviceInfo.txt") ) {
-					r.deviceInfo = IOUtils.readFileUtf8(asset).trim();
-				} else if ( name.equals("boottime.txt") ) {
-					r.bootTime = IOUtils.readFileUtf8(asset).trim();
-				} else if ( name.equals("ip.txt") ) {
-					r.ipData = IOUtils.readFileUtf8(asset).trim();
-				} else if ( name.equals("removedapps") ) {
-					r.removedApps = IOUtils.readFileUtf8(asset).trim();
-				} else {
-					r.assets.add( asset.getPath() );
+				if ( asset.length() > 0 )
+				{
+					name = asset.getName();
+					
+					if ( name.endsWith(".conf") ) {
+						r.settings = IOUtils.readFileUtf8(asset).trim();
+					} else if ( name.endsWith(".log") ) {
+						r.logs.add( IOUtils.readFileUtf8(asset).trim() );
+					} else if ( name.equals("deviceInfo.txt") ) {
+						r.deviceInfo = IOUtils.readFileUtf8(asset).trim();
+					} else if ( name.equals("boottime.txt") ) {
+						r.bootTime = IOUtils.readFileUtf8(asset).trim();
+					} else if ( name.equals("ip.txt") ) {
+						r.ipData = IOUtils.readFileUtf8(asset).trim();
+					} else if ( name.equals("removedapps") ) {
+						r.removedApps = IOUtils.readFileUtf8(asset).trim();
+					} else {
+						r.assets.add( asset.getPath() );
+					}
 				}
 			}
 
@@ -84,38 +92,36 @@ public class ReportCollector
 		for (String folderPath: m_folders)
 		{
 			File folder = new File(folderPath);
-			File[] listOfFiles = folder.listFiles( new ReportFilter() );
+			File[] listOfFiles = folder.listFiles(this);
 
-			for (File f: listOfFiles) {
-				reports.add( extractReport(f) );
+			if (listOfFiles != null)
+			{
+				for (File f: listOfFiles) {
+					reports.add( extractReport(f) );
+				}
 			}
 		}
 		
 		return reports;
 	}
-
-
-	private class ReportFilter implements FileFilter
+	
+	
+	@Override
+	public boolean accept(File path)
 	{
-		private static final String REPORT_REGEX = "^[0-9]*$";
+		String name = path.getName();
 
-		@Override
-		public boolean accept(File path)
-		{
-			String name = path.getName();
+		if ( path.isDirectory() ) {
+			return name.matches(REPORT_REGEX);
+		} else {
+			int periodIndex = name.lastIndexOf(".");
 
-			if ( path.isDirectory() ) {
-				return name.matches(REPORT_REGEX);
-			} else {
-				int periodIndex = name.lastIndexOf(".");
-
-				if (periodIndex > 0) {
-					String fileName = name.substring(0, periodIndex);
-					return fileName.matches(REPORT_REGEX) && name.endsWith(".txt");
-				}
+			if (periodIndex > 0) {
+				String fileName = name.substring(0, periodIndex);
+				return fileName.matches(REPORT_REGEX) && name.endsWith(".txt");
 			}
-
-			return false;
 		}
+
+		return false;
 	}
 }

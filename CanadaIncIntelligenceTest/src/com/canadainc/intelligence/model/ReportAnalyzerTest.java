@@ -4,6 +4,7 @@ import static org.junit.Assert.*;
 
 import java.io.File;
 import java.io.IOException;
+import java.sql.Connection;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
@@ -50,10 +51,10 @@ public class ReportAnalyzerTest
 		assertEquals( 300, fr.conversationsFetched.get(0).intValue() );
 		assertEquals( 150, fr.conversationsFetched.get(6).intValue() );
 		
-		assertEquals( 7, fr.elementsFetched.size() );
-		assertEquals( 14, fr.elementsFetched.get(0).intValue() );
-		assertEquals( 0, fr.elementsFetched.get(5).intValue() );
-		assertEquals( 27, fr.elementsFetched.get(6).intValue() );
+		assertEquals( 7, fr.pimElementsFetched.size() );
+		assertEquals( 14, fr.pimElementsFetched.get(0).intValue() );
+		assertEquals( 0, fr.pimElementsFetched.get(5).intValue() );
+		assertEquals( 27, fr.pimElementsFetched.get(6).intValue() );
 		
 		assertEquals(7, fr.totalAccounts);
 		
@@ -167,23 +168,9 @@ public class ReportAnalyzerTest
 	@Test
 	public void testAnalyzeSingleReport() throws IOException
 	{
-		Consumer c = new Consumer()
-		{
-			@Override
-			public void consume(Report r, FormattedReport result) {}
-
-			@Override
-			public String consumeSetting(String key, String value, FormattedReport fr) {
-				return key.equals("bookmarks") ? value : null;
-			}
-		};
-		Map<String,Consumer> consumers = new HashMap<String,Consumer>();
-		consumers.put("oct10", c);
-		
 		Report r = ReportCollector.extractReport( new File("res/single_report/1399751585701.txt") );
 		ReportAnalyzer instance = new ReportAnalyzer();
 		instance.setReport(r);
-		instance.setConsumers(consumers);
 
 		FormattedReport fr = instance.analyze();
 		assertEquals("oct10", fr.appInfo.name);
@@ -202,9 +189,6 @@ public class ReportAnalyzerTest
 		assertEquals( 1, locations.size() );
 		assertEquals( 45.4114, locations.get(0).latitude, 0.01 );
 		assertEquals( -75.6901, locations.get(0).longitude, 0.01 );
-		
-		assertEquals( 1, fr.appSettings.size() );
-		assertTrue( fr.appSettings.containsKey("bookmarks") );
 	}
 	
 	
@@ -231,17 +215,17 @@ public class ReportAnalyzerTest
 		assertEquals( 31, fr.batteryInfo.temperature );
 		assertEquals( 692178944, fr.availableMemory );
 		
-		assertEquals( "10.231.180.108", fr.userInfo.network.bcm0 );
-		assertEquals( "FE80:3B::96EB:CDFF:FE91:9C2C", fr.userInfo.network.bptp0 );
-		assertEquals( "c73-039.rim.net", fr.userInfo.network.host );
-		assertEquals( "208.65.73.39", fr.userInfo.network.ip );
-		assertEquals( "10.87.1.15", fr.userInfo.network.msm0 );
+		assertEquals( "10.231.180.108", fr.network.bcm0 );
+		assertEquals( "FE80:3B::96EB:CDFF:FE91:9C2C", fr.network.bptp0 );
+		assertEquals( "c73-039.rim.net", fr.network.host );
+		assertEquals( "208.65.73.39", fr.network.ip );
+		assertEquals( "10.87.1.15", fr.network.msm0 );
 		
 		assertEquals( 95, fr.removedApps.size() );
 		DeviceAppInfo dai = fr.removedApps.get(0);
 		assertEquals( "DialogTest.testRel_DialogTest_2443ae1a", dai.packageName );
 		assertEquals( "10.3.0.17", dai.packageVersion );
-		assertNull(dai.appWorldInfo);
+		assertEquals(0, dai.appWorldInfo.id);
 		
 		dai = fr.removedApps.get(2);
 		assertEquals( "Stocks.BB10.gYABgMQXznH4wRvvvN74EmaRiM0", dai.packageName );

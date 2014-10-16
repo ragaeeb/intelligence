@@ -21,6 +21,7 @@ import com.canadainc.intelligence.model.DeviceAppInfo;
 import com.canadainc.intelligence.model.FormattedReport;
 import com.canadainc.intelligence.model.Location;
 import com.canadainc.intelligence.model.Report;
+import com.maxmind.geoip.LookupService;
 
 public class ReportAnalyzer
 {
@@ -30,26 +31,48 @@ public class ReportAnalyzer
 	private static final DateFormat BOOT_TIME_FORMAT = new SimpleDateFormat("MMM dd HH:mm:ss z yyyy"); // Aug 21 16:18:37 EDT 2014
 	public static final Pattern VALID_EMAIL_ADDRESS_REGEX = Pattern.compile("^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,6}$", Pattern.CASE_INSENSITIVE);
 	private static Collection<String> EXCLUDED_SETTINGS = new HashSet<String>();
+	private static Collection<String> USER_EVENTS_TO_FIX = new HashSet<String>();
 	private static final String INSTALL_DATA = "dat::";
-	private Map<String,Consumer> m_consumers = new HashMap<String,Consumer>();
-	private Consumer m_consumer;
+	private LookupService m_ls;
+	private Map<String,String> m_consumers = new HashMap<String,String>();
+	private boolean m_userInitiated = false;
 	
+	boolean isUserInitiated()
+	{
+		return m_userInitiated;
+	}
+
+
 	static {
 		EXCLUDED_SETTINGS.add("accountId");
 		EXCLUDED_SETTINGS.add("adminMode");
 		EXCLUDED_SETTINGS.add("alreadyReviewed");
 		EXCLUDED_SETTINGS.add("analytics_collected");
+		EXCLUDED_SETTINGS.add("hideAgreement");
 		EXCLUDED_SETTINGS.add("init");
 		EXCLUDED_SETTINGS.add("logCard");
 		EXCLUDED_SETTINGS.add("logService");
 		EXCLUDED_SETTINGS.add("logUI");
 		EXCLUDED_SETTINGS.add("promoted");
 		EXCLUDED_SETTINGS.add("purchasesRefreshed");
+		EXCLUDED_SETTINGS.add("startLogging");
 		EXCLUDED_SETTINGS.add("stopLogging");
+		EXCLUDED_SETTINGS.add("unblockedSelf");
+		
+		USER_EVENTS_TO_FIX.add("Tab");
+		USER_EVENTS_TO_FIX.add("Changed");
+		USER_EVENTS_TO_FIX.add("Triggered");
+		USER_EVENTS_TO_FIX.add("Page");
+		USER_EVENTS_TO_FIX.add("Tapped");
+		USER_EVENTS_TO_FIX.add("Selected");
 	}
 
-	public void setConsumers(Map<String,Consumer> consumers) {
+	public void setConsumers(Map<String,String> consumers) {
 		m_consumers = consumers;
+	}
+	
+	public void setLookupService(LookupService ls) {
+		m_ls = ls;
 	}
 
 	public Report getReport() {
@@ -58,6 +81,10 @@ public class ReportAnalyzer
 
 	public void setReport(Report report) {
 		m_report = report;
+	}
+	
+	public Consumer getConsumer() {
+		return m_result.consumer;
 	}
 
 	public ReportAnalyzer()
@@ -74,9 +101,33 @@ public class ReportAnalyzer
 			result = TextUtils.getValues("applicationName:", deviceInfo);
 		}
 		
-		if ( !result.isEmpty() ) {
+		if ( !result.isEmpty() )
+		{
 			m_result.appInfo.name = result.get(0);
-			m_consumer = m_consumers.get(m_result.appInfo.name);
+			
+			try {
+				String consumer = m_consumers.get(m_result.appInfo.name);
+				
+				if (consumer != null)
+				{
+					Class<Consumer> c = (Class<Consumer>)Class.forName(consumer);
+					m_result.consumer = (Consumer)c.newInstance();
+				}
+			} catch (ClassNotFoundException | InstantiationException | IllegalAccessException e) {
+				e.printStackTrace();
+			}
+		}
+		
+		result = TextUtils.getValues("applicationVersion:", deviceInfo);
+		if ( !result.isEmpty() ) {
+			m_result.appInfo.version = result.get(0);
+		}
+		
+		result = TextUtils.getValues("Notes:", deviceInfo);
+		if ( !result.isEmpty() )
+		{
+			String notes = result.get(0);
+			m_userInitiated = !notes.isEmpty() && !notes.equals("[canadainc_collect_analytics]");
 		}
 
 		try {
@@ -101,6 +152,19 @@ public class ReportAnalyzer
 			m_result.memoryUsage = Long.parseLong( result.get(0) );
 		}
 		
+		result = TextUtils.getValues("totalDeviceMemory:", deviceInfo);
+		if ( !result.isEmpty() ) {
+			m_result.hardwareInfo.deviceMemory = Long.parseLong( result.get(0) );
+		}
+		
+		result = TextUtils.getValues("HardwareID:", deviceInfo);
+		if ( !result.isEmpty() ) {
+			m_result.hardwareInfo.hardwareID = result.get(0);
+		} else {
+			result = TextUtils.getValues("Hardware ID:", deviceInfo);
+			m_result.hardwareInfo.hardwareID = result.get(0);
+		}
+		
 		result = TextUtils.getValues("availableDeviceMemory:", deviceInfo);
 		if ( !result.isEmpty() ) {
 			m_result.availableMemory = Long.parseLong( result.get(0) );
@@ -123,7 +187,7 @@ public class ReportAnalyzer
 		
 		result = TextUtils.getValues("BatteryTemperature:", deviceInfo);
 		if ( !result.isEmpty() ) {
-			m_result.batteryInfo.temperature = Integer.parseInt( result.get(0) );
+			m_result.batteryInfo.temperature = (int)Math.round( Double.parseDouble( result.get(0) ) );
 		}
 		
 		result = TextUtils.getValues("InternalDevice:", deviceInfo);
@@ -133,17 +197,17 @@ public class ReportAnalyzer
 		
 		result = TextUtils.getEqualValue("bcm0", deviceInfo);
 		if ( !result.isEmpty() ) {
-			m_result.userInfo.network.bcm0 = result.get(0);
+			m_result.network.bcm0 = result.get(0);
 		}
 		
 		result = TextUtils.getEqualValue("bptp0", deviceInfo);
 		if ( !result.isEmpty() ) {
-			m_result.userInfo.network.bptp0 = result.get(0);
+			m_result.network.bptp0 = result.get(0);
 		}
 		
 		result = TextUtils.getEqualValue("msm0", deviceInfo);
 		if ( !result.isEmpty() ) {
-			m_result.userInfo.network.msm0 = result.get(0);
+			m_result.network.msm0 = result.get(0);
 		}
 
 		m_result.hardwareInfo.machine = TextUtils.getValues("Machine:", deviceInfo).get(0);
@@ -204,19 +268,13 @@ public class ReportAnalyzer
 			result = TextUtils.getValues("UserEvent:", log);
 			for (String event: result)
 			{
-				int lastSpaceIndex = event.lastIndexOf(" ");
+				String[] tokens = event.split(" ");
 				
-				if (lastSpaceIndex == -1) {
-					m_result.userEvents.add(event);
-				} else {
-					String rest = event.substring(lastSpaceIndex+1);
-					
-					if ( rest.matches("-?\\d+(\\.\\d+)?") ) {
-						m_result.userEvents.add( event.substring(0, lastSpaceIndex) );
-					} else {
-						m_result.userEvents.add(event);
-					}
+				if ( tokens.length > 1 && USER_EVENTS_TO_FIX.contains(tokens[1]) ) {
+					tokens[0] += tokens[1];
 				}
+				
+				m_result.userEvents.add(tokens[0]);
 			}
 			
 			result = TextUtils.getValues("CURRENT ACCOUNT ID! >>>", log);
@@ -228,7 +286,7 @@ public class ReportAnalyzer
 					String addressField = tokens[3];
 					addressField = addressField.substring( 1, addressField.length()-1 ); // without quotes
 					
-					if ( VALID_EMAIL_ADDRESS_REGEX.matcher(addressField).find() ) {
+					if ( VALID_EMAIL_ADDRESS_REGEX.matcher(addressField).find() && !addressField.isEmpty() ) {
 						m_result.userInfo.emails.add(addressField);
 					}
 				}
@@ -250,7 +308,7 @@ public class ReportAnalyzer
 			for (String total: result)
 			{
 				int n = Integer.parseInt(total);
-				m_result.elementsFetched.add(n);
+				m_result.pimElementsFetched.add(n);
 			}
 			
 			List<String> settings = TextUtils.getValues("getValueFor:", log);
@@ -269,9 +327,9 @@ public class ReportAnalyzer
 	{
 		if ( !EXCLUDED_SETTINGS.contains(key) && !key.startsWith("tutorial") && !value.startsWith("@Variant") && !key.matches("v\\d+.\\d+") && !m_result.appSettings.containsKey(key) ) // avoid lookups on UILogs when settings file already contains them
 		{
-			if (m_consumer != null)
+			if (m_result.consumer != null)
 			{
-				value = m_consumer.consumeSetting(key, value, m_result);
+				value = m_result.consumer.consumeSetting(key, value, m_result);
 				
 				if (value != null)
 				{
@@ -319,7 +377,7 @@ public class ReportAnalyzer
 		try {
 			m_result.bootTime = BOOT_TIME_FORMAT.parse(m_report.bootTime).getTime();
 		} catch (ParseException e) {
-			e.printStackTrace();
+			//e.printStackTrace();
 		}
 	}
 	
@@ -327,8 +385,35 @@ public class ReportAnalyzer
 	private void analyzeIpData()
 	{
 		String[] data = m_report.ipData.split("\n");
-		m_result.userInfo.network.ip = data[0].split("=")[1].trim();
-		m_result.userInfo.network.host = data[1].split("=")[1].trim();
+		m_result.network.ip = data[0].split("=")[1].trim();
+		m_result.network.host = data[1].split("=")[1].trim();
+		
+		if (m_ls != null)
+		{
+			com.maxmind.geoip.Location l = m_ls.getLocation(m_result.network.ip);
+			
+			if (l != null)
+			{
+				Location location = new Location();
+				
+				if (l.city != null) {
+					location.city = l.city;
+				}
+
+				if (l.countryName != null) {
+					location.country = l.countryName;
+				}
+				
+				if ( l.region != null && !l.region.matches("\\d+") ) {
+					location.region = l.region;
+				}
+
+				location.latitude = l.latitude;
+				location.longitude = l.longitude;
+
+				m_result.locations.add(location);
+			}
+		}
 	}
 
 	
@@ -339,51 +424,55 @@ public class ReportAnalyzer
 		
 		for (String app: data)
 		{
-			DeviceAppInfo dai = new DeviceAppInfo();
-			int bbWorldStart = app.indexOf(INSTALL_DATA);
-			
-			if (bbWorldStart >= 0)
-			{
-				String appWorldData = app.substring(bbWorldStart);
-				app = app.substring(0, bbWorldStart-1);
-				int start = appWorldData.indexOf("{");
-				int end = appWorldData.lastIndexOf("}");
-				String awData = appWorldData.substring(start+1, end).trim();
-				String regex = "\\s+(?=((\\\\[\\\\\"]|[^\\\\\"])*\"(\\\\[\\\\\"]|[^\\\\\"])*\")*(\\\\[\\\\\"]|[^\\\\\"])*$)";
-				awData = awData.replaceAll(regex, "");
-				String[] awMetaData = awData.split(",");
+			try {
+				DeviceAppInfo dai = new DeviceAppInfo();
+				int bbWorldStart = app.indexOf(INSTALL_DATA);
 				
-				AppWorldInfo awi = new AppWorldInfo();
-				
-				for (String attribute: awMetaData)
+				if (bbWorldStart >= 0)
 				{
-					String[] attributes = attribute.split(":(?=([^\"]*\"[^\"]*\")*[^\"]*$)");
-					String key = TextUtils.removeQuotes(attributes[0]);
-					String value = TextUtils.removeQuotes(attributes[1]);
+					String appWorldData = app.substring(bbWorldStart);
+					app = app.substring(0, bbWorldStart-1);
+					int start = appWorldData.indexOf("{");
+					int end = appWorldData.lastIndexOf("}");
+					String awData = appWorldData.substring(start+1, end).trim();
+					String regex = "\\s+(?=((\\\\[\\\\\"]|[^\\\\\"])*\"(\\\\[\\\\\"]|[^\\\\\"])*\")*(\\\\[\\\\\"]|[^\\\\\"])*$)";
+					awData = awData.replaceAll(regex, "");
+					String[] awMetaData = awData.split(",");
 					
-					if ( key.equals("contentID") ) {
-						awi.contentId = Integer.parseInt(value);
-					} else if ( key.equals("iconID") ) {
-						awi.iconUri = value;
-					} else if ( key.equals("id") ) {
-						awi.id = Integer.parseInt(value);
-					} else if ( key.equals("sku") ) {
-						awi.sku = value;
-					} else if ( key.equals("vendor") ) {
-						awi.vendor = value;
-					} else if ( key.equals("name") ) {
-						awi.name = value;
+					AppWorldInfo awi = new AppWorldInfo();
+					
+					for (String attribute: awMetaData)
+					{
+						String[] attributes = attribute.split(":(?=([^\"]*\"[^\"]*\")*[^\"]*$)");
+						String key = TextUtils.removeQuotes(attributes[0]);
+						String value = TextUtils.removeQuotes(attributes[1]);
+						
+						if ( key.equals("contentID") ) {
+							awi.contentId = Integer.parseInt(value);
+						} else if ( key.equals("iconID") ) {
+							awi.iconUri = value;
+						} else if ( key.equals("id") ) {
+							awi.id = Integer.parseInt(value);
+						} else if ( key.equals("sku") ) {
+							awi.sku = value;
+						} else if ( key.equals("vendor") ) {
+							awi.vendor = value;
+						} else if ( key.equals("name") ) {
+							awi.name = value;
+						}
 					}
+					
+					dai.appWorldInfo = awi;
 				}
-				
-				dai.appWorldInfo = awi;
+
+				String[] tokens = app.split(",");
+
+				dai.packageName = tokens[0].split("::")[0];
+				dai.packageVersion = tokens[1];
+				m_result.removedApps.add(dai);
+			} catch (ArrayIndexOutOfBoundsException ex) {
+				// ignore app
 			}
-
-			String[] tokens = app.split(",");
-
-			dai.packageName = tokens[0].split("::")[0];
-			dai.packageVersion = tokens[1];
-			m_result.removedApps.add(dai);
 		}
 	}
 	
@@ -396,7 +485,7 @@ public class ReportAnalyzer
 	
 	public FormattedReport analyze()
 	{
-		m_result = new FormattedReport();
+		m_result = new FormattedReport(m_report.timestamp);
 
 		if ( !m_report.deviceInfo.isEmpty() ) {
 			analyzeDeviceInfo();
@@ -422,8 +511,8 @@ public class ReportAnalyzer
 			analyzeLogs();
 		}
 		
-		if (m_consumer != null) {
-			m_consumer.consume(m_report, m_result);
+		if (m_result.consumer != null) {
+			m_result.consumer.consume(m_report, m_result);
 		}
 		
 		cleanUp();
