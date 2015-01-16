@@ -12,7 +12,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import com.canadainc.common.text.TextUtils;
-import com.canadainc.intelligence.client.QuranConsumer.QuranPlaylist;
 import com.canadainc.intelligence.model.FormattedReport;
 import com.canadainc.intelligence.model.InAppSearch;
 import com.canadainc.intelligence.model.Report;
@@ -183,10 +182,13 @@ public class SunnahConsumer implements Consumer
 				String match = log.substring( m.start(), m.end() );
 				String[] tokens = match.split(" (?=(([^'\"]*['\"]){2})*[^'\"]*$)");
 
-				InvokeTarget it = new InvokeTarget( TextUtils.removeQuotes(tokens[2]) );
-				it.uri = TextUtils.removeQuotes(tokens[5]);
-				it.data = TextUtils.removeQuotes(tokens[6]);
-				fr.invokeTargets.add(it);
+				if (tokens.length > 5)
+				{
+					InvokeTarget it = new InvokeTarget( TextUtils.removeQuotes(tokens[2]) );
+					it.uri = TextUtils.removeQuotes(tokens[5]);
+					it.data = TextUtils.removeQuotes(tokens[6]);
+					fr.invokeTargets.add(it);
+				}
 			}
 			
 			result = TextUtils.getValues("addToHomeScreen", log);

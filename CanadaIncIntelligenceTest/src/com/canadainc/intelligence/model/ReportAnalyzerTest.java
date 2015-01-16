@@ -1,22 +1,17 @@
 package com.canadainc.intelligence.model;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
-import java.sql.Connection;
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Date;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 
 import org.junit.Test;
 
-import com.canadainc.common.io.IOUtils;
-import com.canadainc.intelligence.client.Consumer;
 import com.canadainc.intelligence.controller.ReportAnalyzer;
 import com.canadainc.intelligence.io.ReportCollector;
 
@@ -43,7 +38,7 @@ public class ReportAnalyzerTest
 		assertEquals("en_US", fr.locale);
 		assertEquals( 151990272, fr.memoryUsage );
 		
-		assertEquals( 6, fr.appSettings.size() );
+		assertEquals( 8, fr.appSettings.size() );
 		assertEquals( "3", fr.appSettings.get("keywordThreshold") );
 		assertEquals( "1", fr.appSettings.get("whitelistContacts") );
 		
@@ -74,6 +69,20 @@ public class ReportAnalyzerTest
 	
 	
 	@Test
+	public void testUserDetails() throws IOException
+	{
+		Report r = ReportCollector.extractReport( new File("res/auto_block/1419245059903") );
+		ReportAnalyzer instance = new ReportAnalyzer();
+		instance.setReport(r);
+
+		FormattedReport fr = instance.analyze();
+		assertEquals( "Diane Garceau", fr.userInfo.name );
+		assertEquals( 2, fr.userInfo.emails.size() );
+		assertEquals( "dianegarceau@gmail.com", fr.userInfo.emails.get(0) );
+	}
+	
+	
+	@Test
 	public void testAnalyzeAutoReply() throws IOException
 	{
 		Report r = ReportCollector.extractReport( new File("res/autoreply/1401448387928") );
@@ -94,6 +103,20 @@ public class ReportAnalyzerTest
 		assertEquals( "SubmitLogs", fr.userEvents.get( fr.userEvents.size()-1 ) );
 	}
 	
+	
+	@Test
+	public void testPinMessages() throws IOException
+	{
+		Report r = ReportCollector.extractReport( new File("res/auto_block/1419245059903") );
+		ReportAnalyzer instance = new ReportAnalyzer();
+		instance.setReport(r);
+		
+		FormattedReport fr = instance.analyze();
+		assertEquals( "24E79D45", fr.userInfo.pin );
+		assertEquals( 1, fr.userInfo.emails.size() );
+		assertEquals( "lautla@lautla.com", fr.userInfo.emails.get(0) );
+	}
+	
 
 	@Test
 	public void testAnalyzeQuran() throws IOException
@@ -111,7 +134,7 @@ public class ReportAnalyzerTest
 		assertTrue( fr.locale.isEmpty() );
 		assertEquals( 212058112, fr.memoryUsage );
 		
-		assertEquals( 17, fr.appSettings.size() );
+		assertEquals( 16, fr.appSettings.size() );
 		assertEquals( "1", fr.appSettings.get("alFurqanAdvertised") );
 		assertNull( fr.appSettings.get("v3.5") );
 		
@@ -155,13 +178,13 @@ public class ReportAnalyzerTest
 		assertEquals( 68, stats.get( stats.size()-1 ).duration );
 		assertEquals( 3, stats.get( stats.size()-1 ).elements );
 		
-		assertEquals( 5, fr.appSettings.size() );
+		assertEquals( 4, fr.appSettings.size() );
 		assertEquals( "201404061716", fr.appSettings.get("dbVersion") );
 		assertEquals( "0.004", fr.appSettings.get("radius") );
 		
 		assertEquals( 5, fr.userEvents.size() );
 		assertEquals( "StopTriggered", fr.userEvents.get(0) );
-		assertEquals( "RoutePickerSheet Cancel", fr.userEvents.get( fr.userEvents.size()-1 ) );
+		assertEquals( "RoutePickerSheet", fr.userEvents.get( fr.userEvents.size()-1 ) );
 	}
 	
 	

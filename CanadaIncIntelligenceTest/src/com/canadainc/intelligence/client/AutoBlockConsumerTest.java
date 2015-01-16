@@ -1,6 +1,8 @@
 package com.canadainc.intelligence.client;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
@@ -16,7 +18,6 @@ import com.canadainc.common.io.DatabaseUtils;
 import com.canadainc.intelligence.controller.ReportAnalyzer;
 import com.canadainc.intelligence.io.ReportCollector;
 import com.canadainc.intelligence.model.FormattedReport;
-import com.canadainc.intelligence.model.InAppSearch;
 import com.canadainc.intelligence.model.Location;
 import com.canadainc.intelligence.model.Report;
 import com.maxmind.geoip.LookupService;

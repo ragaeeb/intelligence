@@ -13,7 +13,6 @@ import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
 
 import com.canadainc.common.text.TextUtils;
-import com.canadainc.intelligence.controller.ReportAnalyzer;
 import com.canadainc.intelligence.model.FormattedReport;
 import com.canadainc.intelligence.model.InAppSearch;
 import com.canadainc.intelligence.model.Report;

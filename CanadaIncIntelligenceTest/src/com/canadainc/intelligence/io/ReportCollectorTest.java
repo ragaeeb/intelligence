@@ -1,13 +1,14 @@
 package com.canadainc.intelligence.io;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.io.IOException;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 
-import org.junit.Before;
 import org.junit.Test;
 
 import com.canadainc.intelligence.model.Report;
@@ -16,6 +17,31 @@ public class ReportCollectorTest
 {
 	private ReportCollector m_instance;
 
+	@Test
+	public void testRunZipReports()
+	{
+		m_instance = new ReportCollector(false);
+		Collection<String> folders = new HashSet<String>();
+		folders.add("res/zip_reports");
+		m_instance.setFolders(folders);
+		
+		try {
+			Collection<Report> reports = m_instance.run();
+			assertEquals( 1, reports.size() );
+			
+			for (Report r: reports) {
+				assertEquals( Long.parseLong("1420770291525"), r.timestamp );
+				assertTrue( !r.deviceInfo.isEmpty() );
+				assertTrue( !r.logs.isEmpty() );
+				assertTrue( !r.settings.isEmpty() );
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+			fail("Failed!");
+		}
+	}
+	
+	
 	@Test
 	public void testRunSingleReport()
 	{
@@ -76,7 +102,7 @@ public class ReportCollectorTest
 		
 		try {
 			List<Report> reports = m_instance.run();
-			assertEquals( 2, reports.size() );
+			assertEquals( 3, reports.size() );
 			
 			Report r = reports.get(0);
 			assertEquals( Long.parseLong("1403455028364"), r.timestamp );

@@ -18,37 +18,70 @@ import com.canadainc.intelligence.model.Report;
 
 public class QuranConsumer implements Consumer
 {
+	public class QuranPlaylist
+	{
+		public int fromChapter;
+		public int fromVerse;
+		public int toChapter;
+		public int toVerse;
+
+		public QuranPlaylist(int chapter, int fromVerse, int toChapter, int toVerse)
+		{
+			this.fromChapter = chapter;
+			this.fromVerse = fromVerse;
+			this.toChapter = toChapter;
+			this.toVerse = toVerse;
+		}
+	}
 	private static Collection<String> EXCLUDED_SETTINGS = new HashSet<String>();
+
 	static {
 		EXCLUDED_SETTINGS.add("alFurqanAdvertised");
 		EXCLUDED_SETTINGS.add("firstTime");
 		EXCLUDED_SETTINGS.add("hideAgreement");
 		EXCLUDED_SETTINGS.add("tafsirTutorialCount");
 	}
-
+	private static void populate(List<Integer> l, Pattern regex, String value)
+	{
+		Matcher m = regex.matcher(value);
+		while ( m.find() )
+		{
+			String result = value.substring( m.start(), m.end() );
+			result = result.substring( result.lastIndexOf(" ")+1 );
+			l.add( Integer.parseInt(result) );
+		}
+	}
 	private Collection<QuranBookmark> m_bookmarks = new HashSet<QuranBookmark>();
 	private List<Integer> m_chaptersVisited = new ArrayList<Integer>();
+	private Connection m_connection;
 	private List<QuranBookmark> m_homescreens = new ArrayList<QuranBookmark>();
 	private List<QuranPlaylist> m_playlists = new ArrayList<QuranPlaylist>();
+
 	private List<Integer> m_tafsirInterested = new ArrayList<Integer>();
 	private List<Integer> m_tafsirVisited = new ArrayList<Integer>();
 	private final Pattern openSurahRegex = Pattern.compile("QString, \"SELECT arabic_uthmani.text as arabic,arabic_uthmani.verse_id[^\n]+");
-
 	private final Pattern openSurahRegexTransliteration = Pattern.compile("QString, \"SELECT transliteration.text as arabic,transliteration.verse_id[^\n]+");
+
 	private final Pattern searchSurahNameRegex = Pattern.compile("QString, \"SELECT surah_id,arabic_name[^\n]+");
+
 	private final Pattern surahRegex = Pattern.compile("surah_id\", QVariant\\(int,\\s+\\d{1,3}");
 	private final Pattern tafsirInterestRegex = Pattern.compile("QString, \"SELECT id,description,verse_id,explainer[^\n]+");
 
 	private final Pattern tafsirVisitedRegex = Pattern.compile("QString, \"SELECT \\* from tafsir_[^\n]+");
-
+	
+	
 	private final Pattern verseRegex = Pattern.compile("verse_id\"\\s+,\\s+QVariant\\(int,\\s+\\d{1,3}");
-	private Connection m_connection;
 
 	public QuranConsumer()
 	{
 	}
-	
-	
+
+	@Override
+	public void close() throws SQLException
+	{
+		m_connection.close();
+	}
+
 	@Override
 	public void consume(Report r, FormattedReport fr)
 	{
@@ -184,25 +217,32 @@ public class QuranConsumer implements Consumer
 	public List<Integer> getChaptersVisited() {
 		return m_chaptersVisited;
 	}
+	
+	
+	@Override
+	public Connection getConnection()
+	{
+		return m_connection;
+	}
+
 
 	public List<QuranBookmark> getHomescreens() {
 		return m_homescreens;
 	}
-
+	
 	public List<QuranPlaylist> getPlaylists() {
 		return m_playlists;
 	}
-
+	
 	public List<Integer> getTafsirInterested() {
 		return m_tafsirInterested;
 	}
-	
-	
+
 	public List<Integer> getTafsirVisited() {
 		return m_tafsirVisited;
 	}
-
-
+	
+	
 	@Override
 	public void save(FormattedReport fr)
 	{
@@ -304,33 +344,7 @@ public class QuranConsumer implements Consumer
 			}
 		}
 	}
-	
-	private static void populate(List<Integer> l, Pattern regex, String value)
-	{
-		Matcher m = regex.matcher(value);
-		while ( m.find() )
-		{
-			String result = value.substring( m.start(), m.end() );
-			result = result.substring( result.lastIndexOf(" ")+1 );
-			l.add( Integer.parseInt(result) );
-		}
-	}
-	
-	public class QuranPlaylist
-	{
-		public int fromChapter;
-		public int fromVerse;
-		public int toChapter;
-		public int toVerse;
 
-		public QuranPlaylist(int chapter, int fromVerse, int toChapter, int toVerse)
-		{
-			this.fromChapter = chapter;
-			this.fromVerse = fromVerse;
-			this.toChapter = toChapter;
-			this.toVerse = toVerse;
-		}
-	}
 
 	@Override
 	public void setPath(String path) throws Exception
@@ -341,19 +355,5 @@ public class QuranConsumer implements Consumer
 		
 		m_connection = DriverManager.getConnection("jdbc:sqlite:"+path);
 		m_connection.setAutoCommit(false);
-	}
-	
-	
-	@Override
-	public void close() throws SQLException
-	{
-		m_connection.close();
-	}
-
-
-	@Override
-	public Connection getConnection()
-	{
-		return m_connection;
 	}
 }

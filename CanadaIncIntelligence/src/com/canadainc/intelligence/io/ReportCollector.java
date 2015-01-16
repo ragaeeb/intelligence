@@ -1,10 +1,14 @@
 package com.canadainc.intelligence.io;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 import com.canadainc.common.io.IOUtils;
 import com.canadainc.intelligence.model.Report;
@@ -12,11 +16,20 @@ import com.canadainc.intelligence.model.Report;
 public class ReportCollector implements DataCollector
 {
 	private static final String REPORT_REGEX = "^[0-9]*$";
-	
-	private Collection<String> m_folders;
+	private static final String FILE_SEPARATOR = System.getProperty("file.separator");
 
+	private Collection<String> m_folders;
+	private boolean m_deleteOriginal;
+
+	public ReportCollector(boolean deleteOriginal)
+	{
+		m_deleteOriginal = deleteOriginal;
+	}
+	
+	
 	public ReportCollector()
 	{
+		this(true);
 	}
 
 
@@ -29,13 +42,19 @@ public class ReportCollector implements DataCollector
 	}
 
 	
-	public static Report extractReport(File f) throws IOException
+	public static Report extractReport(File f) throws IOException {
+		return extractReport(f, true);
+	}
+	
+
+	public static Report extractReport(File f, boolean deleteOriginal) throws IOException
 	{
 		Report r = new Report();
 
-		String name = f.getName();
+		String original = f.getName();
+		String name = original;
 		int lastDot = name.lastIndexOf(".");
-		
+
 		if (lastDot > -1) {
 			name = name.substring(0, lastDot);
 		}
@@ -44,33 +63,17 @@ public class ReportCollector implements DataCollector
 
 		if ( f.isDirectory() )
 		{
-			File[] assets = f.listFiles();
-
-			for (File asset: assets)
-			{
-				if ( asset.length() > 0 )
-				{
-					name = asset.getName();
-					
-					if ( name.endsWith(".conf") ) {
-						r.settings = IOUtils.readFileUtf8(asset).trim();
-					} else if ( name.endsWith(".log") ) {
-						r.logs.add( IOUtils.readFileUtf8(asset).trim() );
-					} else if ( name.equals("deviceInfo.txt") ) {
-						r.deviceInfo = IOUtils.readFileUtf8(asset).trim();
-					} else if ( name.equals("boottime.txt") ) {
-						r.bootTime = IOUtils.readFileUtf8(asset).trim();
-					} else if ( name.equals("ip.txt") ) {
-						r.ipData = IOUtils.readFileUtf8(asset).trim();
-					} else if ( name.equals("removedapps") ) {
-						r.removedApps = IOUtils.readFileUtf8(asset).trim();
-					} else {
-						r.assets.add( asset.getPath() );
-					}
-				}
+			processFolder(f,r);
+		} else if ( original.endsWith(".zip") ) {
+			String target = f.getParent()+FILE_SEPARATOR+name;
+			unzip( f.getPath(), target );
+			
+			if (deleteOriginal) {
+				f.deleteOnExit();
 			}
-
-		} else { // legacy text file
+			
+			processFolder( new File(target), r );
+		} else if ( original.endsWith(".txt") ) { // legacy text file
 			String content = IOUtils.readFileUtf8(f);
 			int logIndex = content.indexOf("[uilog]");
 
@@ -80,10 +83,41 @@ public class ReportCollector implements DataCollector
 				r.logs.add( content.substring( logIndex, content.length() ).trim() );
 			}
 		}
-		
+
 		return r;
 	}
-	
+
+
+	private static void processFolder(File f, Report r) throws IOException
+	{
+		String name;
+		File[] assets = f.listFiles();
+
+		for (File asset: assets)
+		{
+			if ( asset.length() > 0 )
+			{
+				name = asset.getName();
+
+				if ( name.endsWith(".conf") ) {
+					r.settings = IOUtils.readFileUtf8(asset).trim();
+				} else if ( name.endsWith(".log") ) {
+					r.logs.add( IOUtils.readFileUtf8(asset).trim() );
+				} else if ( name.equals("deviceInfo.txt") ) {
+					r.deviceInfo = IOUtils.readFileUtf8(asset).trim();
+				} else if ( name.equals("boottime.txt") ) {
+					r.bootTime = IOUtils.readFileUtf8(asset).trim();
+				} else if ( name.equals("ip.txt") ) {
+					r.ipData = IOUtils.readFileUtf8(asset).trim();
+				} else if ( name.equals("removedapps") ) {
+					r.removedApps = IOUtils.readFileUtf8(asset).trim();
+				} else {
+					r.assets.add( asset.getPath() );
+				}
+			}
+		}
+	}
+
 
 	public List<Report> run() throws IOException
 	{
@@ -97,15 +131,15 @@ public class ReportCollector implements DataCollector
 			if (listOfFiles != null)
 			{
 				for (File f: listOfFiles) {
-					reports.add( extractReport(f) );
+					reports.add( extractReport(f, m_deleteOriginal) );
 				}
 			}
 		}
-		
+
 		return reports;
 	}
-	
-	
+
+
 	@Override
 	public boolean accept(File path)
 	{
@@ -118,10 +152,56 @@ public class ReportCollector implements DataCollector
 
 			if (periodIndex > 0) {
 				String fileName = name.substring(0, periodIndex);
-				return fileName.matches(REPORT_REGEX) && name.endsWith(".txt");
+				return fileName.matches(REPORT_REGEX) && ( name.endsWith(".txt") || name.endsWith(".zip") );
 			}
 		}
 
 		return false;
 	}
+
+
+	private static void unzip(String zipFile, String outputFolder){
+
+		byte[] buffer = new byte[1024];
+
+		try{
+
+			//create output directory is not exists
+			File folder = new File(".");
+			if(!folder.exists()){
+				folder.mkdir();
+			}
+
+			//get the zip file content
+			ZipInputStream zis = new ZipInputStream(new FileInputStream(zipFile));
+			//get the zipped file list entry
+			ZipEntry ze = zis.getNextEntry();
+
+			while(ze!=null){
+
+				String fileName = ze.getName();
+				File newFile = new File(outputFolder + File.separator + fileName);
+
+				//create all non exists folders
+				//else you will hit FileNotFoundException for compressed folder
+				new File(newFile.getParent()).mkdirs();
+
+				FileOutputStream fos = new FileOutputStream(newFile);             
+
+				int len;
+				while ((len = zis.read(buffer)) > 0) {
+					fos.write(buffer, 0, len);
+				}
+
+				fos.close();   
+				ze = zis.getNextEntry();
+			}
+
+			zis.closeEntry();
+			zis.close();
+
+		}catch(IOException ex){
+			ex.printStackTrace(); 
+		}
+	}    
 }

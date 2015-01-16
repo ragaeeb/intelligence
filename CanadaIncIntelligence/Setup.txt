@@ -25,6 +25,11 @@ CREATE TABLE elements_fetched(report_id INTEGER REFERENCES reports(id), type TEX
 CREATE TABLE in_app_searches(report_id INTEGER REFERENCES reports(id), name TEXT, query_value TEXT);
 CREATE TABLE invoke_targets(report_id INTEGER REFERENCES reports(id), target_id TEXT, uri TEXT, data TEXT);
 
+CREATE TABLE 
+
+
+messagetemplates:
+CREATE TABLE IF NOT EXISTS message_templates(report_id INTEGER REFERENCES reports(id), name TEXT, message TEXT, UNIQUE(report_id, name) ON CONFLICT REPLACE);
 
 
 golden:

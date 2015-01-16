@@ -12,8 +12,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import com.canadainc.common.text.TextUtils;
-import com.canadainc.intelligence.client.QuranConsumer.QuranPlaylist;
-import com.canadainc.intelligence.client.SunnahConsumer.SunnahShortcut;
 import com.canadainc.intelligence.model.FormattedReport;
 import com.canadainc.intelligence.model.Report;
 

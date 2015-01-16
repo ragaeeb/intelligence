@@ -25,6 +25,8 @@ import com.maxmind.geoip.LookupService;
 
 public class ReportAnalyzer
 {
+	private static final String EMAIL_ADDRESS_HEADER = "Email Address:";
+	private static final String USER_DETAILS_HEADER = "Notes: UserEnteredReport: Name:";
 	private Report m_report;
 	private FormattedReport m_result;
 	private static final DateFormat OS_CREATION_FORMAT = new SimpleDateFormat("yyyy/MM/dd-HH:mm:ssz"); // OS Creation: 2014/02/09-15:22:47EST
@@ -128,6 +130,29 @@ public class ReportAnalyzer
 		{
 			String notes = result.get(0);
 			m_userInitiated = !notes.isEmpty() && !notes.equals("[canadainc_collect_analytics]");
+		}
+		
+		if ( deviceInfo.startsWith(USER_DETAILS_HEADER) )
+		{
+			int startOfName = USER_DETAILS_HEADER.length()+1;
+			int endOfName = deviceInfo.indexOf(EMAIL_ADDRESS_HEADER, startOfName+1);
+			String name = deviceInfo.substring(startOfName, endOfName).trim();
+			
+			if ( !name.isEmpty() ) {
+				m_result.userInfo.name = name;
+			}
+			
+			int startOfEmail = deviceInfo.indexOf(EMAIL_ADDRESS_HEADER)+1;
+			int endOfEmail = deviceInfo.indexOf("Summary of Bug:", startOfEmail+1);
+			
+			if (startOfEmail >= 0 && endOfEmail >= startOfEmail)
+			{
+				name = deviceInfo.substring( startOfEmail+EMAIL_ADDRESS_HEADER.length(), endOfEmail ).trim();
+				
+				if ( !name.isEmpty() && VALID_EMAIL_ADDRESS_REGEX.matcher(name).find() ) {
+					m_result.userInfo.emails.add(name);
+				}
+			}
 		}
 
 		try {
@@ -278,17 +303,35 @@ public class ReportAnalyzer
 			}
 			
 			result = TextUtils.getValues("CURRENT ACCOUNT ID! >>>", log);
+			result.addAll( TextUtils.getValues("AccountImporter.cpp 56", log) );
+			
 			for (String account: result)
 			{
 				String[] tokens = account.split(" (?=(([^'\"]*['\"]){2})*[^'\"]*$)");
 				
 				if (tokens.length > 3) {
 					String addressField = tokens[3];
-					addressField = addressField.substring( 1, addressField.length()-1 ); // without quotes
-					
-					if ( VALID_EMAIL_ADDRESS_REGEX.matcher(addressField).find() && !addressField.isEmpty() ) {
-						m_result.userInfo.emails.add(addressField);
-					}
+					parseEmail(addressField);
+				}
+			}
+			
+			result = TextUtils.getValues("AccountImporter.cpp 56", log);
+			for (String account: result)
+			{
+				String[] tokens = account.split(" (?=(([^'\"]*['\"]){2})*[^'\"]*$)");
+				
+				if ( tokens.length > 5 && tokens[3].equals("\"imapemail\"") )
+				{
+					String addressField = tokens[tokens.length-1];
+					parseEmail(addressField);
+				}
+			}
+			
+			result = TextUtils.getValues("199 \"pin\" \"PIN Messages\"", log);
+			for (String account: result)
+			{
+				if ( !account.isEmpty() ) {
+					m_result.userInfo.pin = TextUtils.removeQuotes(account);
 				}
 			}
 			
@@ -311,14 +354,37 @@ public class ReportAnalyzer
 				m_result.pimElementsFetched.add(n);
 			}
 			
-			List<String> settings = TextUtils.getValues("getValueFor:", log);
-			for (String setting: settings)
+			result = TextUtils.getValues("getValueFor:", log);
+			for (String setting: result)
 			{
 				int separatorIndex = setting.indexOf(" ");
 				String key = setting.substring(1, separatorIndex-1); // start quote and end quote
 				String value = setting.substring(separatorIndex).trim();
 				doLookup(key, value);
 			}
+			
+			result = TextUtils.findMatch("getValueFor\\s+\"[^\n]+", log);
+			for (String setting: result)
+			{
+				int indexOfFirstQuote = setting.indexOf("\"");
+				int indexOfLastQuote = setting.indexOf("\"", indexOfFirstQuote+1);
+				
+				if (indexOfLastQuote > indexOfFirstQuote)
+				{
+					String key = setting.substring(indexOfFirstQuote+1, indexOfLastQuote);
+					String value = setting.substring(indexOfLastQuote+1).trim();
+					doLookup(key, value);
+				}
+			}
+		}
+	}
+
+	private void parseEmail(String addressField)
+	{
+		addressField = TextUtils.removeQuotes(addressField); // without quotes
+		
+		if ( VALID_EMAIL_ADDRESS_REGEX.matcher(addressField).find() && !addressField.isEmpty() ) {
+			m_result.userInfo.emails.add(addressField);
 		}
 	}
 	

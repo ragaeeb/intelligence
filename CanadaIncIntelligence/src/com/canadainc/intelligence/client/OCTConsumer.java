@@ -10,8 +10,6 @@ import java.util.HashSet;
 import java.util.List;
 
 import com.canadainc.common.text.TextUtils;
-import com.canadainc.intelligence.client.SunnahConsumer.SunnahBook;
-import com.canadainc.intelligence.client.SunnahConsumer.SunnahShortcut;
 import com.canadainc.intelligence.model.FormattedReport;
 import com.canadainc.intelligence.model.InAppSearch;
 import com.canadainc.intelligence.model.Report;

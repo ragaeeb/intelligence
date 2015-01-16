@@ -36,14 +36,16 @@ public class Application
 
 		m_collector = new ReportCollector();
 		Collection<String> folders = new ArrayList<String>();
-		folders.add("res/autoblock");
-		folders.add("res/autoreply");
-		folders.add("res/exporter");
-		folders.add("res/golden_retriever");
-		folders.add("res/oct");
-		folders.add("res/quran10");
-		folders.add("res/salat10");
-		folders.add("res/sunnah10");
+		folders.add("res/reports");
+//		folders.add("res/autoblock");
+//		folders.add("res/autoreply");
+//		folders.add("res/exporter");
+//		folders.add("res/golden_retriever");
+//		folders.add("res/oct");
+//		folders.add("res/oct10");
+//		folders.add("res/quran10");
+//		folders.add("res/salat10");
+//		folders.add("res/sunnah10");
 		m_collector.setFolders(folders);
 		
 		folders = new ArrayList<String>();
@@ -77,6 +79,7 @@ public class Application
 		for (int i = 0; i < n; i++)
 		{
 			Report r = reports.get(i);
+			//System.out.println( r.timestamp );
 
 			if ( !r.deviceInfo.isEmpty() )
 			{
