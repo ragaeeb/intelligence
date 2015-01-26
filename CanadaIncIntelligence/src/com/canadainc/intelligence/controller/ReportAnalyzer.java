@@ -15,6 +15,7 @@ import java.util.regex.Pattern;
 
 import com.canadainc.common.text.TextUtils;
 import com.canadainc.intelligence.client.Consumer;
+import com.canadainc.intelligence.model.AppLaunchInfo;
 import com.canadainc.intelligence.model.AppWorldInfo;
 import com.canadainc.intelligence.model.DatabaseStat;
 import com.canadainc.intelligence.model.DeviceAppInfo;
@@ -481,6 +482,35 @@ public class ReportAnalyzer
 			}
 		}
 	}
+	
+	
+	private void analyzeAppLaunches()
+	{
+		String[] data = m_report.appLaunchData.split("\n");
+		
+		for (int i = 1; i < data.length; i++)
+		{
+			String[] tokens = data[i].split(", ");
+
+			if (tokens.length >= 7)
+			{
+				try {
+					AppLaunchInfo ali = new AppLaunchInfo();
+					ali.name = tokens[0].trim();
+					ali.type = AppLaunchInfo.LaunchType.valueOf( tokens[1].trim().replaceAll("\\s+", "") );
+					ali.launcherSendStat = Double.parseDouble( tokens[2].trim() );
+					ali.processCreatedStat = Double.parseDouble( tokens[3].trim() );
+					ali.windowPostedStat = Double.parseDouble( tokens[4].trim() );
+					ali.fullyVisibleStat = Double.parseDouble( tokens[5].trim() );
+					
+					m_result.appLaunches.add(ali);
+				} catch (Exception ex) {
+					System.out.println(m_result.id);
+					ex.printStackTrace();
+				}
+			}
+		}
+	}
 
 	
 	private void analyzeRemovedApps()
@@ -575,6 +605,10 @@ public class ReportAnalyzer
 
 		if ( !m_report.logs.isEmpty() ) {
 			analyzeLogs();
+		}
+		
+		if ( !m_report.appLaunchData.isEmpty() ) {
+			analyzeAppLaunches();
 		}
 		
 		if (m_result.consumer != null) {

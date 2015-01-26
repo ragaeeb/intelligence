@@ -4,6 +4,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.HashSet;
@@ -11,6 +12,7 @@ import java.util.List;
 
 import org.junit.Test;
 
+import com.canadainc.common.io.IOUtils;
 import com.canadainc.intelligence.model.Report;
 
 public class ReportCollectorTest
@@ -39,6 +41,8 @@ public class ReportCollectorTest
 			e.printStackTrace();
 			fail("Failed!");
 		}
+		
+		IOUtils.deleteDirectory( new File("res/zip_reports/1420770291525") );
 	}
 	
 	
@@ -120,6 +124,9 @@ public class ReportCollectorTest
 			assertTrue( !r.ipData.isEmpty() );
 			assertEquals( 1, r.assets.size() );
 			assertEquals( "res/auto_block/1406619880273/database.db", r.assets.get(0) );
+			
+			r = reports.get(2);
+			assertTrue( !r.appLaunchData.isEmpty() );
 		} catch (IOException e) {
 			e.printStackTrace();
 			fail("Failed!");

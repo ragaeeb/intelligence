@@ -66,6 +66,26 @@ public class ReportAnalyzerTest
 		assertEquals( "MultiBlock", fr.userEvents.get(0) );
 		assertEquals( "MultiBlock", fr.userEvents.get( fr.userEvents.size()-1 ) );
 	}
+
+	
+	@Test
+	public void testAppLaunches() throws IOException
+	{
+		Report r = ReportCollector.extractReport( new File("res/auto_block/1419245059903") );
+		ReportAnalyzer instance = new ReportAnalyzer();
+		instance.setReport(r);
+
+		FormattedReport fr = instance.analyze();
+		assertEquals( 313, fr.appLaunches.size() );
+		
+		AppLaunchInfo ali = fr.appLaunches.get(0);
+		assertEquals("sys.mediaplayer.gYABgHtLSIC4bjdb005eaW5ixz", ali.name);
+		assertEquals(AppLaunchInfo.LaunchType.PooledCard, ali.type);
+		assertEquals(0, ali.launcherSendStat, 0);
+		assertEquals(0, ali.processCreatedStat, 0);
+		assertEquals(0.025, ali.windowPostedStat, 1);
+		assertEquals(0.365, ali.fullyVisibleStat, 1);
+	}
 	
 	
 	@Test
@@ -113,8 +133,9 @@ public class ReportAnalyzerTest
 		
 		FormattedReport fr = instance.analyze();
 		assertEquals( "24E79D45", fr.userInfo.pin );
-		assertEquals( 1, fr.userInfo.emails.size() );
-		assertEquals( "lautla@lautla.com", fr.userInfo.emails.get(0) );
+		assertEquals( 2, fr.userInfo.emails.size() );
+		assertEquals( "dianegarceau@gmail.com", fr.userInfo.emails.get(0) );
+		assertEquals( "lautla@lautla.com", fr.userInfo.emails.get(1) );
 	}
 	
 

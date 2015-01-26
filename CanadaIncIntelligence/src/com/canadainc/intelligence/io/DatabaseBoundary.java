@@ -13,6 +13,7 @@ import java.util.Map;
 import org.jsoup.helper.StringUtil;
 
 import com.canadainc.intelligence.client.InvokeTarget;
+import com.canadainc.intelligence.model.AppLaunchInfo;
 import com.canadainc.intelligence.model.BulkOperation;
 import com.canadainc.intelligence.model.DatabaseStat;
 import com.canadainc.intelligence.model.DeviceAppInfo;
@@ -33,6 +34,7 @@ public class DatabaseBoundary implements PersistentBoundary
 	private Map<AppInfo, Integer> m_apps = new HashMap<AppInfo, Integer>();
 	private Map<Location, Integer> m_geo = new HashMap<Location, Integer>();
 	private Map<String, Integer> m_deviceApps = new HashMap<String, Integer>();
+	private Map<String, Integer> m_installedApps = new HashMap<String, Integer>();
 	private Map<String, Integer> m_userEvents = new HashMap<String, Integer>();
 	private Map<String, Integer> m_appSettings = new HashMap<String, Integer>();
 	private Map<Long, Long> m_userIds = new HashMap<Long, Long>();
@@ -59,6 +61,47 @@ public class DatabaseBoundary implements PersistentBoundary
 		m_userReports = reports;
 	}
 	
+	
+	public void createTables() throws SQLException
+	{
+		Collection<String> statements = new ArrayList<String>();
+		
+		statements.add("CREATE TABLE devices (id INTEGER PRIMARY KEY, machine TEXT UNIQUE, hardware_id TEXT, model_name TEXT, physical_keyboard INTEGER, model_number TEXT, device_memory INTEGER)");
+		statements.add("CREATE TABLE operating_systems (id INTEGER PRIMARY KEY, version TEXT, creation_date INTEGER, UNIQUE(version, creation_date) ON CONFLICT IGNORE)");
+		statements.add("CREATE TABLE canadainc_apps (id INTEGER PRIMARY KEY, name TEXT NOT NULL, version TEXT NOT NULL, UNIQUE(name, version) ON CONFLICT IGNORE)");
+		statements.add("CREATE TABLE users (id INTEGER PRIMARY KEY, imei TEXT UNIQUE, meid TEXT UNIQUE, pin TEXT UNIQUE, name TEXT, data TEXT)");
+		statements.add("CREATE TABLE user_info (user_id INTEGER REFERENCES users(id), address TEXT UNIQUE ON CONFLICT IGNORE)");
+		statements.add("CREATE TABLE reports (id INTEGER PRIMARY KEY, app_id INTEGER REFERENCES canadainc_apps(id), device_id INTEGER REFERENCES devices(id), os_id INTEGER REFERENCES operating_systems(id), locale TEXT, memory_usage INTEGER, available_memory INTEGER, boot_time INTEGER, battery_temperature INTEGER, battery_level INTEGER, battery_cycle_count INTEGER, battery_charging_state INTEGER, total_accounts INTEGER, user_id INTEGER, node_name TEXT, internal INTEGER, bcm0 TEXT, bptp0 TEXT, msm0 TEXT, ip TEXT, host TEXT)");
+		statements.add("CREATE TABLE geo (id INTEGER PRIMARY KEY, city TEXT, region TEXT, country TEXT, UNIQUE(city, region, country) ON CONFLICT IGNORE)");
+		statements.add("CREATE TABLE locations (report_id INTEGER REFERENCES reports(id), latitude REAL, longitude REAL, geo_id INTEGER REFERENCES geo(id), name TEXT)");
+		statements.add("CREATE TABLE device_apps (id INTEGER PRIMARY KEY, package_name TEXT, version TEXT, bbw_id INTEGER, bbw_content_id INTEGER, bbw_name TEXT, bbw_sku TEXT, bbw_vendor TEXT, bbw_icon_uri TEXT, UNIQUE(package_name,version) ON CONFLICT IGNORE)");
+		statements.add("CREATE TABLE removed_apps (report_id INTEGER REFERENCES reports(id), device_app_id INTEGER REFERENCES device_apps(id))");
+		statements.add("CREATE TABLE database_stats (report_id INTEGER REFERENCES reports(id), query_id INTEGER, duration INTEGER, num_elements INTEGER)");
+		statements.add("CREATE TABLE user_events (id INTEGER PRIMARY KEY, event TEXT UNIQUE)");
+		statements.add("CREATE TABLE app_user_events (report_id INTEGER REFERENCES reports(id), user_event_id INTEGER REFERENCES user_events(id))");
+		statements.add("CREATE TABLE app_settings (id INTEGER PRIMARY KEY, setting_key TEXT UNIQUE)");
+		statements.add("CREATE TABLE report_app_settings (report_id INTEGER REFERENCES reports(id), app_setting_id INTEGER REFERENCES app_settings(id), setting_value TEXT)");
+		
+		statements.add("CREATE TABLE accounts_selected(report_id INTEGER REFERENCES reports(id), account_id INTEGER)");
+		statements.add("CREATE TABLE bulk_operations(report_id INTEGER REFERENCES reports(id), type TEXT, count INTEGER)");
+		statements.add("CREATE TABLE elements_fetched(report_id INTEGER REFERENCES reports(id), type TEXT, count INTEGER)");
+		statements.add("CREATE TABLE in_app_searches(report_id INTEGER REFERENCES reports(id), name TEXT, query_value TEXT)");
+		statements.add("CREATE TABLE invoke_targets(report_id INTEGER REFERENCES reports(id), target_id TEXT, uri TEXT, data TEXT)");
+		
+		statements.add("CREATE TABLE installed_apps (id INTEGER PRIMARY KEY, package_name TEXT UNIQUE ON CONFLICT IGNORE)");
+		statements.add("CREATE TABLE app_launches (report_id INTEGER REFERENCES reports(id), installed_app_id INTEGER REFERENCES installed_apps(id), launch_type INTEGER, launcher_send REAL, process_created REAL, window_posted REAL, fully_visible REAL)");
+		
+		for (String s: statements)
+		{
+			PreparedStatement ps = m_connection.prepareStatement(s);
+			ps.execute();
+			ps.close();
+		}
+		
+		m_connection.commit();
+	}
+	
+	
 	public void process() throws SQLException
 	{
 		try {
@@ -77,6 +120,7 @@ public class DatabaseBoundary implements PersistentBoundary
 				populateInvokes(fr);
 				populatePimData(fr);
 				populateStats(fr);
+				populateAppLaunches(fr);
 			}
 			
 			for (UserData fr: m_userReports)
@@ -96,7 +140,6 @@ public class DatabaseBoundary implements PersistentBoundary
 	{
 		if ( !fr.pin.isEmpty() )
 		{
-			System.out.println("*** INSERTING "+fr.name+","+fr.pin);
 			PreparedStatement ps = m_connection.prepareStatement("SELECT id,pin,name,data FROM users WHERE pin LIKE '%"+fr.pin+"%'");
 			ResultSet rs = ps.executeQuery();
 			
@@ -337,6 +380,54 @@ public class DatabaseBoundary implements PersistentBoundary
 	}
 
 	
+	private void populateAppLaunches(FormattedReport fr) throws SQLException
+	{
+		PreparedStatement ps = m_connection.prepareStatement( "INSERT OR IGNORE INTO installed_apps (package_name) VALUES (?)");
+		Collection<String> unknown = new ArrayList<String>();
+		
+		for (AppLaunchInfo dai: fr.appLaunches)
+		{
+			int i = 0;
+			ps.setString(++i, dai.name);
+			ps.addBatch();
+			
+			if ( !m_installedApps.containsKey(dai.name) ) {
+				unknown.add(dai.name);
+			}
+		}
+		
+		ps.executeBatch();
+		
+		if ( !unknown.isEmpty() )
+		{
+			ps = m_connection.prepareStatement( "SELECT id,package_name FROM installed_apps WHERE package_name IN ('"+StringUtil.join(unknown, "','")+"')" );
+			ResultSet rs = ps.executeQuery();
+			
+			while ( rs.next() ) {
+				m_installedApps.put( rs.getString("package_name"), rs.getInt("id") );
+			}
+		}
+		
+		ps = m_connection.prepareStatement( "INSERT INTO app_launches (report_id,installed_app_id,launch_type,launcher_send,process_created,window_posted,fully_visible) VALUES (?,?,?,?,?,?,?)");
+		
+		for (AppLaunchInfo dai: fr.appLaunches)
+		{
+			int i = 0;
+			ps.setLong(++i, fr.id);
+			ps.setInt( ++i, m_installedApps.get(dai.name) );
+			ps.setInt( ++i, dai.type.ordinal()+1 );
+			ps.setDouble( ++i, dai.launcherSendStat );
+			ps.setDouble( ++i, dai.processCreatedStat );
+			ps.setDouble( ++i, dai.windowPostedStat );
+			ps.setDouble( ++i, dai.fullyVisibleStat );
+			
+			ps.addBatch();
+		}
+		
+		ps.executeBatch();
+	}
+	
+	
 	private void populateRemovedApps(FormattedReport fr) throws SQLException
 	{
 		PreparedStatement ps = m_connection.prepareStatement( "INSERT OR IGNORE INTO device_apps (package_name,version,bbw_id,bbw_content_id,bbw_name,bbw_sku,bbw_vendor,bbw_icon_uri) VALUES (?,?,?,?,?,?,?,?)");
@@ -553,6 +644,7 @@ public class DatabaseBoundary implements PersistentBoundary
 			m_devices.put(machine, i);
 		}
 	}
+	
 
 	public Connection getConnection() {
 		return m_connection;

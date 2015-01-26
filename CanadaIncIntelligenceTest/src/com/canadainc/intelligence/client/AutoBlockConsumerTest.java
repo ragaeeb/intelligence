@@ -33,7 +33,7 @@ public class AutoBlockConsumerTest
 
 		DatabaseUtils.reset( c.getConnection(), tables );
 	}
-	
+
 	@Test
 	public void testConsume() throws IOException
 	{
@@ -45,10 +45,10 @@ public class AutoBlockConsumerTest
 		ra.setReport(r);
 		ra.setConsumers(consumers);
 		FormattedReport fr = ra.analyze();
-		
+
 		assertEquals( 1, fr.invokeTargets.size() );
 		assertEquals( "com.canadainc.AutoBlock.reply", fr.invokeTargets.get(0).target );
-		
+
 		assertEquals( 3, fr.bulkOperations.size() );
 		assertEquals( "insert_inbound_blacklist", fr.bulkOperations.get(0).type );
 		assertEquals( 2, fr.bulkOperations.get(0).count );
@@ -69,13 +69,13 @@ public class AutoBlockConsumerTest
 		ra.setReport(r);
 		ra.setConsumers(consumers);
 		ra.analyze();
-		
+
 		Consumer instance = ra.getConsumer();
 		assertNull( instance.consumeSetting("accountId", "1345666", null) );
 		assertEquals( "1403361639000", instance.consumeSetting("autoblock_junk", "QVariant(QDateTime, QDateTime(\"Sat Jun 21 10:40:39 2014\") )", null) );
 	}
-	
-	
+
+
 	@Test
 	public void testConsumeBulkKeywords() throws Exception
 	{
@@ -88,18 +88,18 @@ public class AutoBlockConsumerTest
 		ra.setReport(r);
 		ra.setConsumers(consumers);
 		FormattedReport fr = ra.analyze();
-		
+
 		assertEquals( 2, fr.bulkOperations.size() );
 		assertEquals( 1294, fr.bulkOperations.get(1).count );
 		assertEquals( 3, fr.inAppSearches.size() );
-		
+
 		assertEquals( "search_logs", fr.inAppSearches.get(0).name );
 		assertEquals( "gold", fr.inAppSearches.get(0).query );
 		assertEquals( "search_inbound_blacklist", fr.inAppSearches.get(1).name );
 		assertEquals( "fire", fr.inAppSearches.get(1).query );
 		assertEquals( "search_inbound_keywords", fr.inAppSearches.get(2).name );
 		assertEquals( "fisj food", fr.inAppSearches.get(2).query );
-		
+
 		assertEquals( 1, fr.locations.size() );
 		Location l = fr.locations.get(0);
 		assertEquals( "Paris", l.city );
@@ -108,10 +108,10 @@ public class AutoBlockConsumerTest
 		assertEquals( 2.333, l.longitude, 3 );
 		assertEquals( "", l.name );
 		assertEquals( "A8", l.region );
-		
+
 		AutoBlockConsumer sbc = (AutoBlockConsumer)ra.getConsumer();
 		reset(sbc);
-		
+
 		sbc.save(fr);
 		PreparedStatement ps = sbc.getConnection().prepareStatement("SELECT * FROM inbound_blacklist");
 		ResultSet rs = ps.executeQuery();
@@ -124,7 +124,7 @@ public class AutoBlockConsumerTest
 		assertEquals( "admin@readyon.biz", rs.getString("address") );
 		assertEquals( 0, rs.getInt("count") );
 		assertTrue( !rs.next() );
-		
+
 		ps = sbc.getConnection().prepareStatement("SELECT * FROM inbound_keywords");
 		rs = ps.executeQuery();
 		assertTrue( rs.next() );
@@ -136,7 +136,7 @@ public class AutoBlockConsumerTest
 		assertEquals( "ѕolutіon", rs.getString("term") );
 		assertEquals( 0, rs.getInt("count") );
 		assertTrue( !rs.next() );
-		
+
 		ps = sbc.getConnection().prepareStatement("SELECT * FROM logs");
 		rs = ps.executeQuery();
 		assertTrue( rs.next() );
@@ -150,7 +150,7 @@ public class AutoBlockConsumerTest
 		assertTrue( rs.getString("message").trim().startsWith(" Cliquez") );
 		assertEquals( 1406615387656L, rs.getLong("timestamp") );
 		assertTrue( !rs.next() );
-		
+
 		ps = sbc.getConnection().prepareStatement("SELECT * FROM outbound_blacklist");
 		rs = ps.executeQuery();
 		assertTrue( rs.next() );
@@ -158,9 +158,11 @@ public class AutoBlockConsumerTest
 		assertEquals( "something@hotmail.com", rs.getString("address") );
 		assertEquals( 5, rs.getInt("count") );
 		assertTrue( !rs.next() );
+
+		sbc.close();
 	}
-	
-	
+
+
 	private void advance(ResultSet rs, int n) throws SQLException
 	{
 		for (int i = 0; i < n; i++) {

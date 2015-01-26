@@ -2,6 +2,7 @@ package com.canadainc.intelligence.io;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.io.IOException;
@@ -16,9 +17,9 @@ import java.util.Map;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
-import com.canadainc.common.io.DatabaseUtils;
 import com.canadainc.intelligence.controller.ReportAnalyzer;
 import com.canadainc.intelligence.model.FormattedReport;
 import com.canadainc.intelligence.model.UserData;
@@ -27,24 +28,43 @@ import com.maxmind.geoip.LookupService;
 public class DatabaseBoundaryTest
 {
 	private DatabaseBoundary m_db;
+	private static final String PATH = "res/analytics.db";
+
+	@BeforeClass
+	public static void begin() throws Exception
+	{
+		Class.forName("org.sqlite.JDBC"); // load the sqlite-JDBC driver using the current class loader
+	}
 
 	@Before
 	public void setUp() throws Exception
 	{
-		Class.forName("org.sqlite.JDBC"); // load the sqlite-JDBC driver using the current class loader
+		File f = new File(PATH);
+		f.delete();
+		f.createNewFile();
 		
-		String[] tables = {"devices", "operating_systems", "canadainc_apps", "reports", "geo", "locations", "removed_apps", "device_apps", "user_events", "app_user_events", "app_settings", "report_app_settings", "in_app_searches", "invoke_targets", "elements_fetched", "bulk_operations", "users", "user_info", "database_stats"};
-		
-		m_db = new DatabaseBoundary("res/analytics.db");
-		
-		DatabaseUtils.reset( m_db.getConnection(), tables );
+		m_db = new DatabaseBoundary(PATH);
+		m_db.createTables();
 	}
 
 	
 	@After
-	public void tearDown() throws Exception
-	{
+	public void tearDown() throws Exception {
 		m_db.close();
+	}
+	
+	
+	@Test
+	public void testCreateTables()
+	{
+		try {
+			PreparedStatement ps = m_db.getConnection().prepareStatement("SELECT name FROM sqlite_master WHERE type='table'");
+			ResultSet rs = ps.executeQuery();
+			advance(rs, 22);
+		} catch (Exception e) {
+			e.printStackTrace();
+			fail();
+		}
 	}
 	
 
@@ -310,6 +330,39 @@ public class DatabaseBoundaryTest
 		assertTrue( !rs.next() );
 	}
 	
+	
+	@Test
+	public void testProcessAutoBlockAppStats() throws SQLException, IOException
+	{
+		ReportAnalyzer ra = new ReportAnalyzer();
+		ra.setReport( ReportCollector.extractReport( new File("res/auto_block/1419245059903") ) );
+		FormattedReport fr = ra.analyze();
+		
+		Collection<FormattedReport> reports = new ArrayList<FormattedReport>();
+		reports.add(fr);
+		
+		m_db.enqueue(reports);
+		m_db.process();
+		
+		PreparedStatement ps = m_db.getConnection().prepareStatement("SELECT * FROM installed_apps");
+		ResultSet rs = ps.executeQuery();
+		assertTrue( rs.next() );
+		assertEquals( 1, rs.getLong("id") );
+		assertEquals( "sys.mediaplayer.gYABgHtLSIC4bjdb005eaW5ixz", rs.getString("package_name") );
+		advance(rs, 37);
+		
+		ps = m_db.getConnection().prepareStatement("SELECT * FROM app_launches");
+		rs = ps.executeQuery();
+		assertEquals( 1419245059903L, rs.getLong("report_id") );
+		assertEquals( 4, rs.getInt("launch_type") );
+		assertEquals( 1, rs.getInt("installed_app_id") );
+		assertEquals( 0, rs.getDouble("launcher_send"), 0 );
+		assertEquals( 0, rs.getDouble("process_created"), 0 );
+		assertEquals( 0.025, rs.getDouble("window_posted"), 1 );
+		assertEquals( 0.365, rs.getDouble("fully_visible"), 1 );
+		
+		advance(rs, 312);
+	}
 	
 	
 	@Test

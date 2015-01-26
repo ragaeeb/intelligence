@@ -111,6 +111,8 @@ public class ReportCollector implements DataCollector
 					r.ipData = IOUtils.readFileUtf8(asset).trim();
 				} else if ( name.equals("removedapps") ) {
 					r.removedApps = IOUtils.readFileUtf8(asset).trim();
+				} else if ( name.equals("app_launch_data.txt") ) {
+					r.appLaunchData = IOUtils.readFileUtf8(asset).trim();
 				} else {
 					r.assets.add( asset.getPath() );
 				}
