@@ -29,7 +29,19 @@ public class Application
 	private Collection<String> m_excluded = new HashSet<String>();
 	private List<Long> m_userInitiated = new ArrayList<Long>();
 
-	private Application() throws Exception
+	private Application()
+	{
+	}
+	
+	
+	public void display() throws Exception
+	{
+		m_db = new DatabaseBoundary("res/analytics.db");
+		m_db.getOperatingSystems(0, null, null);
+	}
+	
+	
+	public void collect() throws Exception
 	{
 		m_ls = new LookupService("res/geo/GeoLiteCity.dat", LookupService.GEOIP_MEMORY_CACHE);
 		m_db = new DatabaseBoundary("res/analytics.db");
@@ -64,6 +76,8 @@ public class Application
 
 		m_excluded.add("Ragaeeb7D");
 		m_excluded.add("BLACKBERRY-D87D");
+		
+		process();
 	}
 
 
@@ -150,7 +164,8 @@ public class Application
 			Class.forName("org.sqlite.JDBC"); // load the sqlite-JDBC driver using the current class loader
 
 			Application app = new Application();
-			app.process();
+			app.collect();
+			//app.display();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

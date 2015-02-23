@@ -10,6 +10,8 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.jsoup.helper.StringUtil;
 
 import com.canadainc.intelligence.client.InvokeTarget;
@@ -59,6 +61,64 @@ public class DatabaseBoundary implements PersistentBoundary
 	public void enqueueUserData(Collection<UserData> reports)
 	{
 		m_userReports = reports;
+	}
+	
+	
+	/**
+	 * With
+	 * @param withinLast The number of days from today to fetch the reports for. For example 30, means within the last 30 days.
+	 * @param minOS Restrict to only a certain OS version number. For example '10.3.0'
+	 * @param maxOS Restrict to only a certain OS version number. For example '10.3.1'
+	 * @throws SQLException
+	 */
+	public void getOperatingSystems(int withinLast, String minOS, String maxOS) throws SQLException
+	{
+		String query = "SELECT COUNT(os_id) AS num_hits,version FROM reports INNER JOIN operating_systems ON operating_systems.id=os_id WHERE os_id NOT NULL";
+		
+		if (withinLast > 0) {
+			query += " AND CAST(strftime('%s', 'now') AS INTEGER)*1000 - reports.id < 3600*24*"+withinLast+"*1000";
+		}
+		
+		if (minOS != null && maxOS != null) {
+			query += " AND version >= '"+minOS+"' AND version < '"+maxOS+"'";
+		}
+		
+		query += " GROUP BY os_id ORDER BY num_hits DESC";
+		
+		PreparedStatement ps = m_connection.prepareStatement(query);
+		ResultSet rs = ps.executeQuery();
+		
+		displayFields(rs);
+		ps.close();
+	}
+
+
+	private void displayFields(ResultSet rs) throws SQLException
+	{
+		int columns = rs.getMetaData().getColumnCount();
+		ArrayList<String> columnNames = new ArrayList<String>(columns);
+		
+		for (int i = 1; i <= columns; i++) {
+			columnNames.add( rs.getMetaData().getColumnLabel(i) );
+		}
+		
+		System.out.println( columnNames.toString() );
+		
+		columnNames.clear();
+		
+		while ( rs.next() )
+		{
+			rs.getMetaData().getColumnCount();
+			System.out.println( rs.getString("version") +"," + rs.getInt("num_hits") );
+		}
+		
+		rs.close();
+	}
+	
+	
+	public void getBatteryInfo()
+	{
+		String query = "SELECT AVG(battery_level) AS avg_battery_level, MAX(battery_temperature) AS max_battery_temp, AVG(battery_temperature) AS avg_battery_temp FROM reports";
 	}
 	
 	
