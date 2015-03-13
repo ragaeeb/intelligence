@@ -73,7 +73,7 @@ public class DatabaseBoundary implements PersistentBoundary
 	 */
 	public void getOperatingSystems(int withinLast, String minOS, String maxOS) throws SQLException
 	{
-		String query = "SELECT COUNT(os_id) AS num_hits,version FROM reports INNER JOIN operating_systems ON operating_systems.id=os_id WHERE os_id NOT NULL";
+		String query = "SELECT version,COUNT(os_id) AS num_hits FROM reports INNER JOIN operating_systems ON operating_systems.id=os_id WHERE os_id NOT NULL";
 		
 		if (withinLast > 0) {
 			query += " AND CAST(strftime('%s', 'now') AS INTEGER)*1000 - reports.id < 3600*24*"+withinLast+"*1000";
@@ -85,6 +85,17 @@ public class DatabaseBoundary implements PersistentBoundary
 		
 		query += " GROUP BY os_id ORDER BY num_hits DESC";
 		
+		PreparedStatement ps = m_connection.prepareStatement(query);
+		ResultSet rs = ps.executeQuery();
+		
+		displayFields(rs);
+		ps.close();
+	}
+	
+	
+	public void getAppSettingValues(String key, String app) throws SQLException
+	{
+		String query = "SELECT setting_value,COUNT(setting_value) AS n FROM (SELECT setting_value FROM report_app_settings INNER JOIN app_settings ON app_settings.id=report_app_settings.app_setting_id INNER JOIN reports ON report_app_settings.report_id=reports.id INNER JOIN canadainc_apps ON reports.app_id=canadainc_apps.id WHERE setting_key='"+key+"' AND setting_value != '@Invalid()' AND canadainc_apps.name='"+app+"') GROUP BY setting_value ORDER BY n DESC";
 		PreparedStatement ps = m_connection.prepareStatement(query);
 		ResultSet rs = ps.executeQuery();
 		
@@ -104,15 +115,26 @@ public class DatabaseBoundary implements PersistentBoundary
 		
 		System.out.println( columnNames.toString() );
 		
-		columnNames.clear();
+		int n = columnNames.size();
 		
 		while ( rs.next() )
 		{
-			rs.getMetaData().getColumnCount();
-			System.out.println( rs.getString("version") +"," + rs.getInt("num_hits") );
+			for (int i = 0; i < n; i++)
+			{
+				String current = rs.getString( columnNames.get(i) );
+				
+				if (i < n-1) {
+					current += ",";
+				}
+				
+				System.out.print(current);
+			}
+			
+			System.out.println();
 		}
 		
 		rs.close();
+		System.out.println();
 	}
 	
 	

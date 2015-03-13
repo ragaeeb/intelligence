@@ -38,6 +38,8 @@ public class Application
 	{
 		m_db = new DatabaseBoundary("res/analytics.db");
 		m_db.getOperatingSystems(0, null, null);
+		m_db.getAppSettingValues("translation", "Quran10");
+		m_db.getAppSettingValues("reciter", "Quran10");
 	}
 	
 	
@@ -164,8 +166,8 @@ public class Application
 			Class.forName("org.sqlite.JDBC"); // load the sqlite-JDBC driver using the current class loader
 
 			Application app = new Application();
-			app.collect();
-			//app.display();
+			//app.collect();
+			app.display();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
