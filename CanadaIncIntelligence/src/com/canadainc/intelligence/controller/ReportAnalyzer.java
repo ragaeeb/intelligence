@@ -13,12 +13,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
+
 import com.canadainc.common.text.TextUtils;
 import com.canadainc.intelligence.client.Consumer;
 import com.canadainc.intelligence.model.AppLaunchInfo;
 import com.canadainc.intelligence.model.AppWorldInfo;
 import com.canadainc.intelligence.model.DatabaseStat;
 import com.canadainc.intelligence.model.DeviceAppInfo;
+import com.canadainc.intelligence.model.DownloadedApp;
 import com.canadainc.intelligence.model.FormattedReport;
 import com.canadainc.intelligence.model.Location;
 import com.canadainc.intelligence.model.Report;
@@ -39,7 +43,7 @@ public class ReportAnalyzer
 	private LookupService m_ls;
 	private Map<String,String> m_consumers = new HashMap<String,String>();
 	private boolean m_userInitiated = false;
-	
+
 	boolean isUserInitiated()
 	{
 		return m_userInitiated;
@@ -61,7 +65,7 @@ public class ReportAnalyzer
 		EXCLUDED_SETTINGS.add("startLogging");
 		EXCLUDED_SETTINGS.add("stopLogging");
 		EXCLUDED_SETTINGS.add("unblockedSelf");
-		
+
 		USER_EVENTS_TO_FIX.add("Tab");
 		USER_EVENTS_TO_FIX.add("Changed");
 		USER_EVENTS_TO_FIX.add("Triggered");
@@ -73,7 +77,7 @@ public class ReportAnalyzer
 	public void setConsumers(Map<String,String> consumers) {
 		m_consumers = consumers;
 	}
-	
+
 	public void setLookupService(LookupService ls) {
 		m_ls = ls;
 	}
@@ -85,7 +89,7 @@ public class ReportAnalyzer
 	public void setReport(Report report) {
 		m_report = report;
 	}
-	
+
 	public Consumer getConsumer() {
 		return m_result.consumer;
 	}
@@ -99,18 +103,18 @@ public class ReportAnalyzer
 	{
 		String deviceInfo = m_report.deviceInfo;
 		List<String> result = TextUtils.getValues("[app] =>", deviceInfo);
-		
+
 		if ( result.isEmpty() ) {
 			result = TextUtils.getValues("applicationName:", deviceInfo);
 		}
-		
+
 		if ( !result.isEmpty() )
 		{
 			m_result.appInfo.name = result.get(0);
-			
+
 			try {
 				String consumer = m_consumers.get(m_result.appInfo.name);
-				
+
 				if (consumer != null)
 				{
 					Class<Consumer> c = (Class<Consumer>)Class.forName(consumer);
@@ -120,36 +124,36 @@ public class ReportAnalyzer
 				e.printStackTrace();
 			}
 		}
-		
+
 		result = TextUtils.getValues("applicationVersion:", deviceInfo);
 		if ( !result.isEmpty() ) {
 			m_result.appInfo.version = result.get(0);
 		}
-		
+
 		result = TextUtils.getValues("Notes:", deviceInfo);
 		if ( !result.isEmpty() )
 		{
 			String notes = result.get(0);
 			m_userInitiated = !notes.isEmpty() && !notes.equals("[canadainc_collect_analytics]");
 		}
-		
+
 		if ( deviceInfo.startsWith(USER_DETAILS_HEADER) )
 		{
 			int startOfName = USER_DETAILS_HEADER.length()+1;
 			int endOfName = deviceInfo.indexOf(EMAIL_ADDRESS_HEADER, startOfName+1);
 			String name = deviceInfo.substring(startOfName, endOfName).trim();
-			
+
 			if ( !name.isEmpty() ) {
 				m_result.userInfo.name = name;
 			}
-			
+
 			int startOfEmail = deviceInfo.indexOf(EMAIL_ADDRESS_HEADER)+1;
 			int endOfEmail = deviceInfo.indexOf("Summary of Bug:", startOfEmail+1);
-			
+
 			if (startOfEmail >= 0 && endOfEmail >= startOfEmail)
 			{
 				name = deviceInfo.substring( startOfEmail+EMAIL_ADDRESS_HEADER.length(), endOfEmail ).trim();
-				
+
 				if ( !name.isEmpty() && VALID_EMAIL_ADDRESS_REGEX.matcher(name).find() ) {
 					m_result.userInfo.emails.add(name);
 				}
@@ -158,31 +162,31 @@ public class ReportAnalyzer
 
 		try {
 			result = TextUtils.getValues("OS Creation:", deviceInfo);
-			
+
 			if ( result.isEmpty() ) {
 				result = TextUtils.getValues("OSCreation:", deviceInfo);
 			}
-			
+
 			m_result.os.creationDate = OS_CREATION_FORMAT.parse( result.get(0) ).getTime();
 		} catch (ParseException ex) {
 			ex.printStackTrace();
 		}
-		
+
 		result = TextUtils.getValues("os:", deviceInfo);
 		if ( !result.isEmpty() ) {
 			m_result.os.version = result.get(0);
 		}
-		
+
 		result = TextUtils.getValues("memoryUsedByCurrentProcess:", deviceInfo);
 		if ( !result.isEmpty() ) {
 			m_result.memoryUsage = Long.parseLong( result.get(0) );
 		}
-		
+
 		result = TextUtils.getValues("totalDeviceMemory:", deviceInfo);
 		if ( !result.isEmpty() ) {
 			m_result.hardwareInfo.deviceMemory = Long.parseLong( result.get(0) );
 		}
-		
+
 		result = TextUtils.getValues("HardwareID:", deviceInfo);
 		if ( !result.isEmpty() ) {
 			m_result.hardwareInfo.hardwareID = result.get(0);
@@ -190,47 +194,47 @@ public class ReportAnalyzer
 			result = TextUtils.getValues("Hardware ID:", deviceInfo);
 			m_result.hardwareInfo.hardwareID = result.get(0);
 		}
-		
+
 		result = TextUtils.getValues("availableDeviceMemory:", deviceInfo);
 		if ( !result.isEmpty() ) {
 			m_result.availableMemory = Long.parseLong( result.get(0) );
 		}
-		
+
 		result = TextUtils.getValues("BatteryChargingState:", deviceInfo);
 		if ( !result.isEmpty() ) {
 			m_result.batteryInfo.chargingState = Integer.parseInt( result.get(0) );
 		}
-		
+
 		result = TextUtils.getValues("BatteryCycleCount:", deviceInfo);
 		if ( !result.isEmpty() ) {
 			m_result.batteryInfo.cycleCount = Integer.parseInt( result.get(0) );
 		}
-		
+
 		result = TextUtils.getValues("BatteryLevel:", deviceInfo);
 		if ( !result.isEmpty() ) {
 			m_result.batteryInfo.level = Integer.parseInt( result.get(0) );
 		}
-		
+
 		result = TextUtils.getValues("BatteryTemperature:", deviceInfo);
 		if ( !result.isEmpty() ) {
 			m_result.batteryInfo.temperature = (int)Math.round( Double.parseDouble( result.get(0) ) );
 		}
-		
+
 		result = TextUtils.getValues("InternalDevice:", deviceInfo);
 		if ( !result.isEmpty() ) {
 			m_result.userInfo.internal = result.get(0).equals("1");
 		}
-		
+
 		result = TextUtils.getEqualValue("bcm0", deviceInfo);
 		if ( !result.isEmpty() ) {
 			m_result.network.bcm0 = result.get(0);
 		}
-		
+
 		result = TextUtils.getEqualValue("bptp0", deviceInfo);
 		if ( !result.isEmpty() ) {
 			m_result.network.bptp0 = result.get(0);
 		}
-		
+
 		result = TextUtils.getEqualValue("msm0", deviceInfo);
 		if ( !result.isEmpty() ) {
 			m_result.network.msm0 = result.get(0);
@@ -247,11 +251,11 @@ public class ReportAnalyzer
 	private void analyzeLogs()
 	{
 		List<String> result;
-		
+
 		for (String log: m_report.logs)
 		{
 			result = TextUtils.getValues("Locale file name:", log);
-			
+
 			if ( !result.isEmpty() )
 			{
 				String locale = result.get(0);
@@ -259,13 +263,13 @@ public class ReportAnalyzer
 				locale = locale.substring( locale.indexOf("_")+1 );
 				m_result.locale = locale;
 			}
-			
+
 			result = TextUtils.getValues("onLoadAsyncResultData", log);
 			DatabaseStat stat = null;
 			for (String timing: result) // we traverse the timings because in case of error, there would not be a matching result list
 			{
 				String[] tokens = timing.split("\\s+");
-				
+
 				if ( tokens[0].equals("Result") ) {
 					stat.elements = Integer.parseInt(tokens[2]);
 					m_result.databaseStats.add(stat);
@@ -290,44 +294,44 @@ public class ReportAnalyzer
 				l.longitude = Double.parseDouble( longitudes.get(i) );
 				m_result.locations.add(l);
 			}
-			
+
 			result = TextUtils.getValues("UserEvent:", log);
 			for (String event: result)
 			{
 				String[] tokens = event.split(" ");
-				
+
 				if ( tokens.length > 1 && USER_EVENTS_TO_FIX.contains(tokens[1]) ) {
 					tokens[0] += tokens[1];
 				}
-				
+
 				m_result.userEvents.add(tokens[0]);
 			}
-			
+
 			result = TextUtils.getValues("CURRENT ACCOUNT ID! >>>", log);
 			result.addAll( TextUtils.getValues("AccountImporter.cpp 56", log) );
-			
+
 			for (String account: result)
 			{
 				String[] tokens = account.split(" (?=(([^'\"]*['\"]){2})*[^'\"]*$)");
-				
+
 				if (tokens.length > 3) {
 					String addressField = tokens[3];
 					parseEmail(addressField);
 				}
 			}
-			
+
 			result = TextUtils.getValues("AccountImporter.cpp 56", log);
 			for (String account: result)
 			{
 				String[] tokens = account.split(" (?=(([^'\"]*['\"]){2})*[^'\"]*$)");
-				
+
 				if ( tokens.length > 5 && tokens[3].equals("\"imapemail\"") )
 				{
 					String addressField = tokens[tokens.length-1];
 					parseEmail(addressField);
 				}
 			}
-			
+
 			result = TextUtils.getValues("199 \"pin\" \"PIN Messages\"", log);
 			for (String account: result)
 			{
@@ -335,26 +339,26 @@ public class ReportAnalyzer
 					m_result.userInfo.pin = TextUtils.removeQuotes(account);
 				}
 			}
-			
+
 			result = TextUtils.getValues("run AccountImporter::run()", log);
 			for (String total: result) {
 				m_result.totalAccounts += Integer.parseInt(total);
 			}
-			
+
 			result = TextUtils.getValues("processAllConversations ==== TOTAL", log);
 			for (String total: result)
 			{
 				int n = Integer.parseInt(total);
 				m_result.conversationsFetched.add(n);
 			}
-			
+
 			result = TextUtils.getValues("getResult Elements generated:", log);
 			for (String total: result)
 			{
 				int n = Integer.parseInt(total);
 				m_result.pimElementsFetched.add(n);
 			}
-			
+
 			result = TextUtils.getValues("getValueFor:", log);
 			for (String setting: result)
 			{
@@ -363,13 +367,13 @@ public class ReportAnalyzer
 				String value = setting.substring(separatorIndex).trim();
 				doLookup(key, value);
 			}
-			
+
 			result = TextUtils.findMatch("getValueFor\\s+\"[^\n]+", log);
 			for (String setting: result)
 			{
 				int indexOfFirstQuote = setting.indexOf("\"");
 				int indexOfLastQuote = setting.indexOf("\"", indexOfFirstQuote+1);
-				
+
 				if (indexOfLastQuote > indexOfFirstQuote)
 				{
 					String key = setting.substring(indexOfFirstQuote+1, indexOfLastQuote);
@@ -383,13 +387,13 @@ public class ReportAnalyzer
 	private void parseEmail(String addressField)
 	{
 		addressField = TextUtils.removeQuotes(addressField); // without quotes
-		
+
 		if ( VALID_EMAIL_ADDRESS_REGEX.matcher(addressField).find() && !addressField.isEmpty() ) {
 			m_result.userInfo.emails.add(addressField);
 		}
 	}
-	
-	
+
+
 	private void doLookup(String key, String value)
 	{
 		if ( !EXCLUDED_SETTINGS.contains(key) && !key.startsWith("tutorial") && !value.startsWith("@Variant") && !key.matches("v\\d+.\\d+") && !m_result.appSettings.containsKey(key) ) // avoid lookups on UILogs when settings file already contains them
@@ -397,14 +401,14 @@ public class ReportAnalyzer
 			if (m_result.consumer != null)
 			{
 				value = m_result.consumer.consumeSetting(key, value, m_result);
-				
+
 				if (value != null)
 				{
 					if ( value.startsWith("QVariant(") ) { // sometimes happens for floats
 						value = value.split(",")[1].trim();
 						value = value.substring( 0, value.length()-1 );
 					}
-					
+
 					m_result.appSettings.put(key, value);
 				} // else reject
 			} else { // accept everything
@@ -414,31 +418,31 @@ public class ReportAnalyzer
 			m_result.installTimestamp = Long.parseLong(value);
 		}
 	}
-	
-	
+
+
 	private void analyzeSettings()
 	{
 		String[] settings = m_report.settings.split("\n");
-		
+
 		for (String setting: settings)
 		{
 			int index = setting.indexOf("=");
-			
+
 			if (index > -1)
 			{
 				String key = setting.substring(0, index);
 				String value = setting.substring(index+1);
-				
+
 				if ( value.startsWith("\"") && value.endsWith("\"") ) { // certain settings that have commas get surrounded by quotes
 					value = TextUtils.removeQuotes(value);
 				}
-				
+
 				doLookup(key, value);
 			}
 		}
 	}
-	
-	
+
+
 	private void analyzeBootTime()
 	{
 		try {
@@ -447,22 +451,22 @@ public class ReportAnalyzer
 			//e.printStackTrace();
 		}
 	}
-	
-	
+
+
 	private void analyzeIpData()
 	{
 		String[] data = m_report.ipData.split("\n");
 		m_result.network.ip = data[0].split("=")[1].trim();
 		m_result.network.host = data[1].split("=")[1].trim();
-		
+
 		if (m_ls != null)
 		{
 			com.maxmind.geoip.Location l = m_ls.getLocation(m_result.network.ip);
-			
+
 			if (l != null)
 			{
 				Location location = new Location();
-				
+
 				if (l.city != null) {
 					location.city = l.city;
 				}
@@ -470,7 +474,7 @@ public class ReportAnalyzer
 				if (l.countryName != null) {
 					location.country = l.countryName;
 				}
-				
+
 				if ( l.region != null && !l.region.matches("\\d+") ) {
 					location.region = l.region;
 				}
@@ -482,12 +486,12 @@ public class ReportAnalyzer
 			}
 		}
 	}
-	
-	
+
+
 	private void analyzeAppLaunches()
 	{
 		String[] data = m_report.appLaunchData.split("\n");
-		
+
 		for (int i = 1; i < data.length; i++)
 		{
 			String[] tokens = data[i].split(", ");
@@ -502,7 +506,7 @@ public class ReportAnalyzer
 					ali.processCreatedStat = Double.parseDouble( tokens[3].trim() );
 					ali.windowPostedStat = Double.parseDouble( tokens[4].trim() );
 					ali.fullyVisibleStat = Double.parseDouble( tokens[5].trim() );
-					
+
 					m_result.appLaunches.add(ali);
 				} catch (Exception ex) {
 					System.out.println(m_result.id);
@@ -512,18 +516,18 @@ public class ReportAnalyzer
 		}
 	}
 
-	
+
 	private void analyzeRemovedApps()
 	{
 		String[] data = m_report.removedApps.split("\n");
 		data = Arrays.copyOfRange(data, 1, data.length);
-		
+
 		for (String app: data)
 		{
 			try {
 				DeviceAppInfo dai = new DeviceAppInfo();
 				int bbWorldStart = app.indexOf(INSTALL_DATA);
-				
+
 				if (bbWorldStart >= 0)
 				{
 					String appWorldData = app.substring(bbWorldStart);
@@ -534,15 +538,15 @@ public class ReportAnalyzer
 					String regex = "\\s+(?=((\\\\[\\\\\"]|[^\\\\\"])*\"(\\\\[\\\\\"]|[^\\\\\"])*\")*(\\\\[\\\\\"]|[^\\\\\"])*$)";
 					awData = awData.replaceAll(regex, "");
 					String[] awMetaData = awData.split(",");
-					
+
 					AppWorldInfo awi = new AppWorldInfo();
-					
+
 					for (String attribute: awMetaData)
 					{
 						String[] attributes = attribute.split(":(?=([^\"]*\"[^\"]*\")*[^\"]*$)");
 						String key = TextUtils.removeQuotes(attributes[0]);
 						String value = TextUtils.removeQuotes(attributes[1]);
-						
+
 						if ( key.equals("contentID") ) {
 							awi.contentId = Integer.parseInt(value);
 						} else if ( key.equals("iconID") ) {
@@ -557,7 +561,7 @@ public class ReportAnalyzer
 							awi.name = value;
 						}
 					}
-					
+
 					dai.appWorldInfo = awi;
 				}
 
@@ -571,14 +575,14 @@ public class ReportAnalyzer
 			}
 		}
 	}
-	
-	
+
+
 	private void cleanUp()
 	{
 		m_result.userInfo.emails = new ArrayList<String>( new LinkedHashSet<String>(m_result.userInfo.emails) );
 	}
-	
-	
+
+
 	public FormattedReport analyze()
 	{
 		m_result = new FormattedReport(m_report.timestamp);
@@ -586,19 +590,19 @@ public class ReportAnalyzer
 		if ( !m_report.deviceInfo.isEmpty() ) {
 			analyzeDeviceInfo();
 		}
-		
+
 		if ( !m_report.settings.isEmpty() ) {
 			analyzeSettings();
 		}
-		
+
 		if ( !m_report.bootTime.isEmpty() ) {
 			analyzeBootTime();
 		}
-		
+
 		if ( !m_report.ipData.isEmpty() ) {
 			analyzeIpData();
 		}
-		
+
 		if ( !m_report.removedApps.isEmpty() ) {
 			analyzeRemovedApps();
 		}
@@ -606,17 +610,66 @@ public class ReportAnalyzer
 		if ( !m_report.logs.isEmpty() ) {
 			analyzeLogs();
 		}
-		
+
 		if ( !m_report.appLaunchData.isEmpty() ) {
 			analyzeAppLaunches();
 		}
-		
+
+		if ( !m_report.progressManager.isEmpty() ) {
+			analyzeProgressManager();
+		}
+
+		if ( !m_report.notes.isEmpty() ) {
+			analyzeNotes();
+		}
+
 		if (m_result.consumer != null) {
 			m_result.consumer.consume(m_report, m_result);
 		}
-		
+
 		cleanUp();
 
 		return m_result;
+	}
+
+	private void analyzeProgressManager()
+	{
+		String[] data = m_report.progressManager.split("\n");
+		JSONParser jp = new JSONParser();
+
+		for (String line: data)
+		{
+			int brace = line.indexOf("{");
+			
+			if (brace >= 0)
+			{
+				line = line.substring( line.indexOf("{") );
+
+				try {
+					JSONObject a = (JSONObject)jp.parse(line);
+					String packageName = (String)a.get("url");
+
+					if ( packageName != null && !packageName.isEmpty() )
+					{
+						packageName = packageName.substring( packageName.indexOf("/")+2 ).trim();
+						String appName = (String)a.get("item");
+						String icon = (String)a.get("icon");
+
+						DownloadedApp d = new DownloadedApp();
+						d.name = appName;
+						d.icon = icon.trim();
+
+						m_result.downloadedApps.put(packageName, d);
+					}
+				} catch (org.json.simple.parser.ParseException e) {
+					e.printStackTrace();
+				}
+			}
+		}
+	}
+
+	private void analyzeNotes()
+	{
+
 	}
 }

@@ -40,6 +40,7 @@ public class QuranConsumer implements Consumer
 		EXCLUDED_SETTINGS.add("firstTime");
 		EXCLUDED_SETTINGS.add("hideAgreement");
 		EXCLUDED_SETTINGS.add("tafsirTutorialCount");
+		EXCLUDED_SETTINGS.add("shaddaTutorial");
 	}
 	private static void populate(List<Integer> l, Pattern regex, String value)
 	{
@@ -93,6 +94,7 @@ public class QuranConsumer implements Consumer
 			{
 				String[] tokens = playlist.split(" ");
 
+				System.out.println(fr.id);
 				QuranPlaylist qp = new QuranPlaylist( Integer.parseInt(tokens[0]), Integer.parseInt(tokens[1]), Integer.parseInt(tokens[0]), Integer.parseInt(tokens[2]) );
 				m_playlists.add(qp);
 			}
@@ -193,7 +195,8 @@ public class QuranConsumer implements Consumer
 			populate(verses, verseRegex, value);
 
 			if ( chapters.size() != verses.size() ) {
-				throw new IllegalArgumentException("Mismatched bookmarks: "+chapters.size()+", "+verses.size() );
+				//throw new IllegalArgumentException("Mismatched bookmarks: "+chapters.size()+", "+verses.size() );
+				return null;
 			}
 
 			for (int i = 0; i < chapters.size(); i++)

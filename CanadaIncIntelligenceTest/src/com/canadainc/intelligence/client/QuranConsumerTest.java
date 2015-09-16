@@ -77,6 +77,23 @@ public class QuranConsumerTest
 
 		c.getConnection().close();
 	}
+	
+	
+	@Test
+	public void testConsumeModern() throws Exception
+	{
+		Map<String,String> consumers = new HashMap<String,String>();
+		consumers.put("Quran10", "com.canadainc.intelligence.client.QuranConsumer");
+
+		Report r = ReportCollector.extractReport( new File("res/quran10/1429351580838") );
+		ReportAnalyzer ra = new ReportAnalyzer();
+		ra.setReport(r);
+		ra.setConsumers(consumers);
+		FormattedReport fr = ra.analyze();
+
+		QuranConsumer c = (QuranConsumer)ra.getConsumer();
+		assertEquals( 7, fr.downloadedApps.size() );
+	}
 
 
 	@Test

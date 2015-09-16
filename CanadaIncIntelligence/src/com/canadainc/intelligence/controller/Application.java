@@ -1,6 +1,7 @@
 package com.canadainc.intelligence.controller;
 
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -50,7 +51,7 @@ public class Application
 
 		m_collector = new ReportCollector();
 		Collection<String> folders = new ArrayList<String>();
-		folders.add("res/reports");
+		folders.add("res/reports2");
 //		folders.add("res/autoblock");
 //		folders.add("res/autoreply");
 //		folders.add("res/exporter");
@@ -155,7 +156,11 @@ public class Application
 
 		Collections.sort(m_userInitiated);
 
-		System.out.println( m_userInitiated.toString() );
+		PrintWriter out = new PrintWriter("res/results_"+end+".txt");
+		out.println( m_userInitiated.toString() );
+		out.close();
+		
+		System.out.println("Written to: results_"+end+".txt");
 		System.out.println("Took "+(end-start)+" ms");
 	}
 
@@ -166,8 +171,8 @@ public class Application
 			Class.forName("org.sqlite.JDBC"); // load the sqlite-JDBC driver using the current class loader
 
 			Application app = new Application();
-			//app.collect();
-			app.display();
+			app.collect();
+			//app.display();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

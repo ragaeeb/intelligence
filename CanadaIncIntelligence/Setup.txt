@@ -1,3 +1,6 @@
+CREATE TABLE IF NOT EXISTS downloaded_apps(
+
+
 messagetemplates:
 CREATE TABLE IF NOT EXISTS message_templates(report_id INTEGER REFERENCES reports(id), name TEXT, message TEXT, UNIQUE(report_id, name) ON CONFLICT REPLACE);
 

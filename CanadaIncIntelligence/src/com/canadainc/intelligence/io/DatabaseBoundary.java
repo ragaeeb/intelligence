@@ -10,8 +10,6 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.jsoup.helper.StringUtil;
 
 import com.canadainc.intelligence.client.InvokeTarget;
@@ -140,7 +138,7 @@ public class DatabaseBoundary implements PersistentBoundary
 	
 	public void getBatteryInfo()
 	{
-		String query = "SELECT AVG(battery_level) AS avg_battery_level, MAX(battery_temperature) AS max_battery_temp, AVG(battery_temperature) AS avg_battery_temp FROM reports";
+		//String query = "SELECT AVG(battery_level) AS avg_battery_level, MAX(battery_temperature) AS max_battery_temp, AVG(battery_temperature) AS avg_battery_temp FROM reports";
 	}
 	
 	
@@ -151,9 +149,9 @@ public class DatabaseBoundary implements PersistentBoundary
 		statements.add("CREATE TABLE devices (id INTEGER PRIMARY KEY, machine TEXT UNIQUE, hardware_id TEXT, model_name TEXT, physical_keyboard INTEGER, model_number TEXT, device_memory INTEGER)");
 		statements.add("CREATE TABLE operating_systems (id INTEGER PRIMARY KEY, version TEXT, creation_date INTEGER, UNIQUE(version, creation_date) ON CONFLICT IGNORE)");
 		statements.add("CREATE TABLE canadainc_apps (id INTEGER PRIMARY KEY, name TEXT NOT NULL, version TEXT NOT NULL, UNIQUE(name, version) ON CONFLICT IGNORE)");
-		statements.add("CREATE TABLE users (id INTEGER PRIMARY KEY, imei TEXT UNIQUE, meid TEXT UNIQUE, pin TEXT UNIQUE, name TEXT, data TEXT)");
+		statements.add("CREATE TABLE users (id INTEGER PRIMARY KEY, imei TEXT UNIQUE, meid TEXT UNIQUE, pin TEXT UNIQUE, name TEXT, data TEXT, volume_label TEXT UNIQUE, fw_id INTEGER UNIQUE)");
 		statements.add("CREATE TABLE user_info (user_id INTEGER REFERENCES users(id), address TEXT UNIQUE ON CONFLICT IGNORE)");
-		statements.add("CREATE TABLE reports (id INTEGER PRIMARY KEY, app_id INTEGER REFERENCES canadainc_apps(id), device_id INTEGER REFERENCES devices(id), os_id INTEGER REFERENCES operating_systems(id), locale TEXT, memory_usage INTEGER, available_memory INTEGER, boot_time INTEGER, battery_temperature INTEGER, battery_level INTEGER, battery_cycle_count INTEGER, battery_charging_state INTEGER, total_accounts INTEGER, user_id INTEGER, node_name TEXT, internal INTEGER, bcm0 TEXT, bptp0 TEXT, msm0 TEXT, ip TEXT, host TEXT)");
+		statements.add("CREATE TABLE reports (id INTEGER PRIMARY KEY, app_id INTEGER REFERENCES canadainc_apps(id), device_id INTEGER REFERENCES devices(id), os_id INTEGER REFERENCES operating_systems(id), locale TEXT, memory_usage INTEGER, available_memory INTEGER, boot_time INTEGER, battery_temperature INTEGER, battery_level INTEGER, battery_cycle_count INTEGER, battery_charging_state INTEGER, total_accounts INTEGER, user_id INTEGER, node_name TEXT, internal INTEGER, bcm0 TEXT, bptp0 TEXT, msm0 TEXT, ip TEXT, host TEXT, radio_on INTEGER, wifi_ssid TEXT, last_captured_file TEXT)");
 		statements.add("CREATE TABLE geo (id INTEGER PRIMARY KEY, city TEXT, region TEXT, country TEXT, UNIQUE(city, region, country) ON CONFLICT IGNORE)");
 		statements.add("CREATE TABLE locations (report_id INTEGER REFERENCES reports(id), latitude REAL, longitude REAL, geo_id INTEGER REFERENCES geo(id), name TEXT)");
 		statements.add("CREATE TABLE device_apps (id INTEGER PRIMARY KEY, package_name TEXT, version TEXT, bbw_id INTEGER, bbw_content_id INTEGER, bbw_name TEXT, bbw_sku TEXT, bbw_vendor TEXT, bbw_icon_uri TEXT, UNIQUE(package_name,version) ON CONFLICT IGNORE)");
@@ -172,6 +170,9 @@ public class DatabaseBoundary implements PersistentBoundary
 		
 		statements.add("CREATE TABLE installed_apps (id INTEGER PRIMARY KEY, package_name TEXT UNIQUE ON CONFLICT IGNORE)");
 		statements.add("CREATE TABLE app_launches (report_id INTEGER REFERENCES reports(id), installed_app_id INTEGER REFERENCES installed_apps(id), launch_type INTEGER, launcher_send REAL, process_created REAL, window_posted REAL, fully_visible REAL)");
+		
+		statements.add("CREATE TABLE downloaded_apps (id INTEGER PRIMARY KEY, package_name TEXT UNIQUE ON CONFLICT IGNORE, name TEXT, icon TEXT)");
+		statements.add("CREATE TABLE report_downloaded_apps (report_id INTEGER REFERENCES reports(id), downloaded_app_id INTEGER REFERENCES installed_apps(id), )");
 		
 		for (String s: statements)
 		{

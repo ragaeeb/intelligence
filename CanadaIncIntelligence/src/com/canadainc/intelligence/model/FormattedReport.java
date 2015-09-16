@@ -39,6 +39,7 @@ public class FormattedReport
 	
 	
 	public List<DeviceAppInfo> removedApps = new ArrayList<DeviceAppInfo>();
+	public Map<String, DownloadedApp> downloadedApps = new HashMap<String, DownloadedApp>();
 	
 	public int totalAccounts;
 	

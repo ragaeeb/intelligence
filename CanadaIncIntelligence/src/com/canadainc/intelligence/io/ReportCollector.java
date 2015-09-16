@@ -99,9 +99,11 @@ public class ReportCollector implements DataCollector
 			{
 				name = asset.getName();
 
-				if ( name.endsWith(".conf") ) {
+				if ( name.equals("flags.conf") ) {
+					r.flags = IOUtils.readFileUtf8(asset).trim();
+				} else if ( name.endsWith(".conf") ) {
 					r.settings = IOUtils.readFileUtf8(asset).trim();
-				} else if ( name.endsWith(".log") ) {
+				} else if ( name.endsWith(".log") || name.equals("slog2.txt") ) {
 					r.logs.add( IOUtils.readFileUtf8(asset).trim() );
 				} else if ( name.equals("deviceInfo.txt") ) {
 					r.deviceInfo = IOUtils.readFileUtf8(asset).trim();
@@ -109,10 +111,14 @@ public class ReportCollector implements DataCollector
 					r.bootTime = IOUtils.readFileUtf8(asset).trim();
 				} else if ( name.equals("ip.txt") ) {
 					r.ipData = IOUtils.readFileUtf8(asset).trim();
-				} else if ( name.equals("removedapps") ) {
+				} else if ( name.startsWith("removedapps") ) {
 					r.removedApps = IOUtils.readFileUtf8(asset).trim();
 				} else if ( name.equals("app_launch_data.txt") ) {
 					r.appLaunchData = IOUtils.readFileUtf8(asset).trim();
+				} else if ( name.equals("notes.txt") ) {
+					r.notes = IOUtils.readFileUtf8(asset).trim();
+				} else if ( name.equals("progress_manager.txt") ) {
+					r.progressManager = IOUtils.readFileUtf8(asset).trim();
 				} else {
 					r.assets.add( asset.getPath() );
 				}
